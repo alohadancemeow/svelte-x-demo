@@ -10,7 +10,7 @@
 </svelte:head>
 
 <div>
-	<main class="mt-6 mx-auto">
+	<main class="mt-6 mx-auto antialiased">
 		{@render children?.()}
 	</main>
 </div>
