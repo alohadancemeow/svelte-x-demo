@@ -8,7 +8,7 @@
   // $inspect(feedType);
 </script>
 
-<div class="max-w-3xl mx-auto">
+<div class="max-w-3xl mx-auto mt-6">
   <div class="bg-background rounded-lg shadow-sm">
     <div class="">
       <!-- Post Form -->
