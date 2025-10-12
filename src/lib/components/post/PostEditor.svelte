@@ -1,12 +1,15 @@
 <script lang="ts">
+  // export const ssr = false;
+
   // import { Editor } from "@tiptap/core";
   import StarterKit from "@tiptap/starter-kit";
   import Placeholder from "@tiptap/extension-placeholder";
   import Link from "@tiptap/extension-link";
+  import BubbleMenu from "@tiptap/extension-bubble-menu";
   import { onDestroy, onMount } from "svelte";
 
   import {
-    BubbleMenu,
+    // BubbleMenu,
     createEditor,
     Editor,
     EditorContent,
@@ -15,26 +18,20 @@
 
   interface PostEditorProps {
     content: string;
-    // onChange: (content: string) => void;
+    text: string;
     placeholder?: string;
     minHeight?: string;
   }
 
   let {
     content = $bindable(),
+    text = $bindable(),
     placeholder,
     minHeight,
   }: PostEditorProps = $props();
 
   let bubbleMenu = $state();
   let editor = $state() as Readable<Editor>;
-
-  // onMount(() => {
-  //   editor = createEditor({
-  //     extensions: [StarterKit],
-  //     content: `Hello world!`,
-  //   });
-  // });
 
   onMount(() => {
     editor = createEditor({
@@ -44,9 +41,9 @@
           codeBlock: false,
           horizontalRule: false,
         }),
-        // BubbleMenu.configure({
-        //   element: bubbleMenu,
-        // }),
+        BubbleMenu.configure({
+          element: bubbleMenu as HTMLElement | null | undefined,
+        }),
         Link.configure({
           openOnClick: false,
           HTMLAttributes: {
@@ -54,15 +51,21 @@
           },
         }),
         Placeholder.configure({
-          placeholder,
+          placeholder: placeholder || "What's on your mind?",
+          showOnlyCurrent: true,
         }),
       ],
       content,
+      // content: `
+      //   <h1>Hello Svelte! 🌍️ </h1>
+      //   <p>This editor is running in Svelte.</p>
+      //   <p>Select some text to see the bubble menu popping up.</p>
+      // `,
       // Disable immediate rendering to prevent SSR issues
       // immediatelyRender: false,
       onUpdate: ({ editor }) => {
-        // onChange(editor.getHTML());
         content = editor.getHTML();
+        text = editor.getText();
       },
       onTransaction: ({ editor }) => {
         // force re-render so `editor.isActive` works as expected
@@ -77,17 +80,18 @@
       },
     });
   });
+
   // onDestroy(() => {
   //   editor?.destroy();
   // });
 
-  // useEffect(() => {
-  //   if (editor && content !== editor.getHTML()) {
-  //     editor.commands.setContent(content);
+  // $effect(() => {
+  //   if (editor && content !== $editor.getHTML()) {
+  //     $editor?.commands?.setContent(content);
   //   }
-  // }, [content, editor]);
+  // });
 </script>
 
 {#if editor}
-  <EditorContent editor={$editor}  />
+  <EditorContent editor={$editor} />
 {/if}

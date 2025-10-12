@@ -8,15 +8,16 @@
         SmilePlusIcon,
         Users2Icon,
         XIcon,
+        Sparkles,
     } from "@lucide/svelte";
     import * as Avatar from "$lib/components/ui/avatar/index.js";
-    // import { useSession } from "next-auth/react";
     import { Button } from "$lib/components/ui/button/index.js";
-    import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
+    import * as Popover from "$lib/components/ui/popover/index.js";
     // import { HiOutlineSparkles } from "react-icons/hi2";
-    import { Separator } from "../ui/separator";
+    import { Separator } from "$lib/components/ui/separator/index.js";
     import * as Select from "$lib/components/ui/select/index.js";
-    // import { toast } from "sonner";
+    // import { useSession } from "next-auth/react";
+    import { toast } from "svelte-sonner";
     // import { useCreatePost } from "@/hooks/use-posts";
     import PostEditor from "$lib/components/post/PostEditor.svelte";
     import Editor from "../editor/editor.svelte";
@@ -68,51 +69,51 @@
     type Feeling = (typeof feelingOptions)[number];
 
     // const { data: session } = useSession();
-    // const [privacy, setPrivacy] = useState<Privacy>("public");
-    // const [feeling, setFeeling] = useState<Feeling | null>(null);
-    // const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-    // const [content, setContent] = useState<string>("");
-    // const [selectedImage, setSelectedImage] = useState<File | null>(null);
-    // const fileInputRef = useRef<HTMLInputElement>(null);
-    // const createPost = useCreatePost();
+    let fileInputRef: HTMLInputElement | null = $state(null);
+    const createPost = { isPending: false };
 
     let privacy: Privacy = $state("public");
     let feeling: Feeling | null = $state(null);
     let previewUrl: string | null = $state(null);
-    let content: string = $state("");
     let selectedImage: File | null = $state(null);
+    let content: string = $state(""); // include html tags
+    let text: string = $state(""); // plain text
 
     let session = null;
 
     const handleImageSelect = (event: any) => {
-        // const file = event.target.files?.[0];
-        // if (file) {
-        //     if (file.size > 10 * 1024 * 1024) {
-        //         toast.error("Image size must be less than 10MB");
-        //         return;
-        //     }
-        //     setSelectedImage(file);
-        //     const url = URL.createObjectURL(file);
-        //     setPreviewUrl(url);
-        // }
+        const file = event.target.files?.[0];
+
+        if (file) {
+            if (file.size > 10 * 1024 * 1024) {
+                toast.error("Image size must be less than 10MB");
+                return;
+            }
+            selectedImage = file;
+
+            const url = URL.createObjectURL(file);
+            previewUrl = url;
+        }
     };
 
     const removeImage = () => {
-        // setSelectedImage(null);
-        // if (previewUrl) {
-        //     URL.revokeObjectURL(previewUrl);
-        //     setPreviewUrl(null);
-        // }
-        // if (fileInputRef.current) {
-        //     fileInputRef.current.value = "";
-        // }
+        selectedImage = null;
+
+        if (previewUrl) {
+            URL.revokeObjectURL(previewUrl);
+            previewUrl = null;
+        }
+
+        if (fileInputRef) {
+            fileInputRef.value = "";
+        }
     };
 
-    const selectedPrivacy = privacyOptions.find(
-        (option) => option.value === privacy,
+    const selectedPrivacy = $derived(
+        privacyOptions.find((option) => option.value === privacy),
     );
 
-    const PrivacyIcon = selectedPrivacy?.icon || Globe2Icon;
+    const PrivacyIcon = $derived(selectedPrivacy?.icon || Globe2Icon);
 
     const handleSubmit = async (e: any) => {
         // e.preventDefault();
@@ -132,7 +133,7 @@
         // }
     };
 
-    $inspect(content, "content");
+    // $inspect(content, "content");
 </script>
 
 <form class="rounded-xl border bg-card transition-shadow">
@@ -155,25 +156,25 @@
             <!-- Post Editor -->
             <div class="flex-1 space-y-4">
                 <div>
-                    <!-- <PostEditor
+                    <PostEditor
                         bind:content
+                        bind:text
                         placeholder="What's on your mind?"
                         minHeight="120px"
-                    /> -->
-
-                    <Editor />
+                    />
                 </div>
+
                 {#if feeling !== null}
                     <div
                         class="flex items-center gap-2 text-sm text-muted-foreground"
                     >
                         <span>Feeling</span>
-                        <span class="font-medium text-foreground">
-                            <!-- {feeling.toLowerCase()} -->
-                            {feeling}
-                        </span>
+                        <span class="font-medium text-foreground"
+                            >{feeling}</span
+                        >
                     </div>
                 {/if}
+
                 {#if previewUrl}
                     <div class="relative">
                         <img
@@ -196,31 +197,34 @@
         </div>
     </div>
 
-    <!-- <div class="border-t bg-muted/40 p-3">
+    <!-- Post Options -->
+    <div class="border-t bg-muted/40 p-3">
         <div class="flex items-center justify-between gap-2">
             <div class="flex items-center gap-2">
                 <div class="flex items-center gap-0.5">
+                    <!-- Image Select -->
                     <input
-                        ref={fileInputRef}
+                        bind:this={fileInputRef}
                         type="file"
                         accept="image/*"
                         class="hidden"
                         id="image-upload"
-                        onChange={handleImageSelect}
+                        onchange={handleImageSelect}
                     />
                     <Button
                         type="button"
                         variant={"ghost"}
                         size={"icon"}
                         class="size-9"
-                        onClick={() => fileInputRef.current?.click()}
+                        onclick={() => fileInputRef?.click()}
                         disabled={false}
                     >
                         <ImagePlusIcon class="size-5" />
                     </Button>
 
-                    <Popover>
-                        <PopoverTrigger asChild>
+                    <!-- Feeling Select -->
+                    <Popover.Root>
+                        <Popover.Trigger>
                             <Button
                                 type="button"
                                 variant={"ghost"}
@@ -230,85 +234,96 @@
                             >
                                 <SmilePlusIcon class="size-5" />
                             </Button>
-                        </PopoverTrigger>
-                        <PopoverContent class="w-64 p-2" align="start">
+                        </Popover.Trigger>
+                        <Popover.Content class="w-64 p-2" align="start">
                             <div class="grid grid-cols-3 gap-1">
-                    {feelingOptions.map((feel, index) => (
-                      <Button
-                        key={feel + index}
-                        variant={feeling === feel ? "secondary" : "ghost"}
-                        class="justify-start h-8 px-2 text-xs"
-                        onClick={() =>
-                          setFeeling(feeling === feel ? null : feel)
-                        }
-                        disabled={feeling === feel}
-                        type="button"
-                      >
-                        {feel}
-                      </Button>
-                    ))}
-                  </div>
-                        </PopoverContent>
-                    </Popover>
+                                {#each feelingOptions as feel, index (index)}
+                                    <Button
+                                        variant={feeling === feel
+                                            ? "secondary"
+                                            : "ghost"}
+                                        class="justify-start h-8 px-2 text-xs"
+                                        onclick={() =>
+                                            (feeling =
+                                                feeling === feel ? null : feel)}
+                                        disabled={feeling === feel}
+                                        type="button"
+                                    >
+                                        {feel}
+                                    </Button>
+                                {/each}
+                            </div>
+                        </Popover.Content>
+                    </Popover.Root>
                     <Button
                         type="button"
                         variant={"ghost"}
                         size={"icon"}
                         class="size-9"
                         disabled={false}
-                        onClick={() => {}}
+                        onclick={() => {}}
                     >
-                        <HiOutlineSparkles class="size-5" />
+                        <Sparkles class="size-5" />
                     </Button>
                 </div>
                 <Separator orientation="vertical" class="h-6" />
-                <Select
-                    value={privacy}
-                    onValueChange={(value: Privacy) => setPrivacy(value)}
+
+                <!-- Post Privacy Select -->
+                <Select.Root
+                    type="single"
+                    bind:value={privacy}
+                    name="postPrivacy"
                 >
-                    <SelectTrigger
+                    <Select.Trigger
                         class="h-9 w-auto border-none bg-transparent px-3 hover:bg-accent [&>span]:flex [&>span]:items-center [&>span]:gap-2"
                     >
                         <div class="flex items-center gap-2">
                             <PrivacyIcon class="size-4" />
-                            <span class="text-sm">{selectedPrivacy?.label}</span
+                            <span class="text-sm"
+                                >{selectedPrivacy?.label ?? privacy}</span
                             >
                         </div>
-                    </SelectTrigger>
-                    <SelectContent align="start" class="w-52">
-                        {privacyOptions.map((option) => (
-                  <SelectItem
-                    key={option.value}
-                    value={option.value}
-                    class="py-2.5"
-                  >
-                    <div class="flex items-start gap-2">
-                      <option.icon class="size-4 mt-0.5" />
-                      <div>
-                        <div class="text-sm">{option.label}</div>
-                        <div class="text-xs text-muted-foreground">
-                          {option.description}
-                        </div>
-                      </div>
-                    </div>
-                  </SelectItem>
-                ))}
-                    </SelectContent>
-                </Select>
+                    </Select.Trigger>
+                    <Select.Content align="start" class="w-52">
+                        <Select.Group>
+                            {#each privacyOptions as option (option.value)}
+                                <Select.Item
+                                    value={option.value}
+                                    label={option.label}
+                                    class="py-2.5"
+                                >
+                                    <div class="flex items-start gap-2">
+                                        <option.icon class="size-4 mt-0.5" />
+                                        <div>
+                                            <div class="text-sm">
+                                                {option.label}
+                                            </div>
+                                            <div
+                                                class="text-xs text-muted-foreground"
+                                            >
+                                                {option.description}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </Select.Item>
+                            {/each}
+                        </Select.Group>
+                    </Select.Content>
+                </Select.Root>
             </div>
 
             <div class="flex items-center gap-4">
                 <div class="text-sm text-muted-foreground">
-                    {content.length}/ 500 characters
+                    {text.length}/ 500 characters
                 </div>
                 <Button type="submit" size={"sm"} class="h-9 px-6">
-                    {createPost.isPending ? (
-                <Loader2Icon class="size-4 animate-spin" />
-              ) : (
-                "Post"
-              )}
+                    {#if createPost.isPending}
+                        <Loader2Icon class="size-4 animate-spin" />
+                    {:else}
+                        Post
+                    {/if}
                 </Button>
             </div>
         </div>
-    </div> -->
+    </div>
 </form>
