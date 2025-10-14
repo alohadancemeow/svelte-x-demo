@@ -48,6 +48,7 @@
 		"@tiptap/extension-text-style": "^3.6.6",
 		"@tiptap/pm": "^3.6.6",
 		"@tiptap/starter-kit": "^3.6.6",
+		"date-fns": "^4.1.0",
 		"svelte-tiptap": "^3.0.0"
 	}
 }
