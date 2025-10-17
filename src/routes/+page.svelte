@@ -4,83 +4,19 @@
   import PostSkeleton from "$lib/components/post/PostSkeleton.svelte";
   import * as Tabs from "$lib/components/ui/tabs/index.js";
   import { cn } from "$lib/utils";
-
   import { authClient } from "$lib/auth-client";
+  import type { PageProps } from "./$types";
+
+  let { data }: PageProps = $props();
   const session = authClient.useSession();
 
-  $inspect($session.data);
+  // $inspect($session.data);
 
   let feedType = $state("following");
 
   // Mock feed state
   let isLoading = $state(false);
-  let isEmpty = $state(false);
-
-  // Mocked paginated data
-  const data = {
-    pages: [
-      {
-        items: [
-          {
-            id: "post_001",
-            content: "<p>Exploring Svelte 5 runes — it feels super snappy!</p>",
-            privacy: "public",
-            feeling: "Excited",
-            image:
-              "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?w=1200&q=80&auto=format&fit=crop",
-            isLiked: false,
-            createdAt: new Date(Date.now() - 1000 * 60 * 10),
-            author: {
-              id: "user_123",
-              name: "Jane Doe",
-              image: "https://github.com/shadcn.png",
-            },
-            _count: {
-              likes: 12,
-              comments: 3,
-            },
-          },
-          {
-            id: "post_002",
-            content: "<p>Tailwind + Svelte is a pleasant combo. Any tips?</p>",
-            privacy: "followers",
-            feeling: "Happy",
-            image: null,
-            isLiked: true,
-            createdAt: new Date(Date.now() - 1000 * 60 * 45),
-            author: {
-              id: "user_456",
-              name: "John Smith",
-              image: "https://avatars.githubusercontent.com/u/9919?s=200&v=4",
-            },
-            _count: {
-              likes: 34,
-              comments: 8,
-            },
-          },
-          {
-            id: "post_003",
-            content: "<p>Working on a SvelteKit demo with mock data.</p>",
-            privacy: "public",
-            feeling: null,
-            image:
-              "https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200&q=80&auto=format&fit=crop",
-            isLiked: false,
-            createdAt: new Date(Date.now() - 1000 * 60 * 60 * 2),
-            author: {
-              id: "user_789",
-              name: "Alex Kim",
-              image: "https://avatars.githubusercontent.com/u/2?v=4",
-            },
-            _count: {
-              likes: 5,
-              comments: 1,
-            },
-          },
-        ],
-      },
-    ],
-  };
+  let isEmpty = $state(data?.posts?.length === 0);
 
   // $inspect(feedType);
 </script>
@@ -149,11 +85,9 @@
         </div>
       {:else}
         <div>
-          {#if data?.pages}
-            {#each data?.pages as page}
-              {#each page.items as post (post.id)}
-                <PostCard {post} />
-              {/each}
+          {#if data.posts}
+            {#each data.posts as post (post.id)}
+              <PostCard {post} />
             {/each}
           {/if}
         </div>
