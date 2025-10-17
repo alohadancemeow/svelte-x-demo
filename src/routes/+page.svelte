@@ -5,6 +5,11 @@
   import * as Tabs from "$lib/components/ui/tabs/index.js";
   import { cn } from "$lib/utils";
 
+  import { authClient } from "$lib/auth-client";
+  const session = authClient.useSession();
+
+  $inspect($session.data);
+
   let feedType = $state("following");
 
   // Mock feed state
@@ -95,7 +100,7 @@
             <Tabs.Trigger
               class={cn(
                 "font-semibold text-base cursor-pointer",
-                feedType === "following" && "bg-muted",
+                feedType === "following" && "bg-muted"
               )}
               value="following"
             >
@@ -104,7 +109,7 @@
             <Tabs.Trigger
               class={cn(
                 "font-semibold text-base cursor-pointer",
-                feedType === "all" && "bg-muted",
+                feedType === "all" && "bg-muted"
               )}
               value="all"
             >
