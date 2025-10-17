@@ -89,9 +89,24 @@
   <div class="bg-background rounded-lg shadow-sm">
     <div class="">
       <!-- Post Form -->
-      <div class="p-4">
-        <PostForm />
-      </div>
+      {#if $session.data}
+        <div class="p-4">
+          <PostForm />
+          <!-- <button onclick={() => authClient.signOut()}>Sign Out</button> -->
+        </div>
+      {:else}
+        <div class="p-4 text-center">
+          <p class="text-muted-foreground mb-3">
+            Unlock to share your thoughts!
+          </p>
+          <a
+            href="/auth/sign-in"
+            class="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+          >
+            Sign In
+          </a>
+        </div>
+      {/if}
 
       <!-- Feed Tabs -->
       <div class="px-4 py-3">
