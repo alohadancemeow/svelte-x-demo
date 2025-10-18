@@ -5,20 +5,32 @@
   import * as Tabs from "$lib/components/ui/tabs/index.js";
   import { cn } from "$lib/utils";
   import { authClient } from "$lib/auth-client";
-  import type { PageProps } from "./$types";
+  import type { PageData, PageProps } from "./$types";
+  import { createQuery } from "@tanstack/svelte-query";
+  import type { PostsWithInfo } from "$lib/zod-schemas";
 
   let { data }: PageProps = $props();
   const session = authClient.useSession();
-
-  // $inspect($session.data);
-
   let feedType = $state("following");
+  let intervalMs = $state(1000);
 
-  // Mock feed state
-  let isLoading = $state(false);
-  let isEmpty = $state(data?.posts?.length === 0);
+  const endpoint = "/api/posts";
 
-  // $inspect(feedType);
+  const fetchPosts = async (): Promise<PostsWithInfo> => {
+    const response = await fetch(endpoint).then((res) => res.json());
+    return response.posts; // Extract the posts array from the response
+  };
+
+  const {
+    data: posts,
+    error,
+    isLoading,
+  } = createQuery(() => ({
+    queryKey: ["posts"],
+    queryFn: fetchPosts,
+    refetchInterval: intervalMs, // Refetch every second
+    // initialData: data?.posts || [], // Server load data is already in the correct format
+  }));
 </script>
 
 <div class="max-w-3xl mx-auto mt-6">
@@ -79,17 +91,28 @@
             <PostSkeleton />
           {/each}
         </div>
-      {:else if isEmpty}
-        <div>
-          <div>No posts found</div>
-        </div>
-      {:else}
-        <div>
-          {#if data.posts}
-            {#each data.posts as post (post.id)}
-              <PostCard {post} />
-            {/each}
+      {:else if error}
+        <div class="p-4 text-center">
+          <div class="text-red-600 mb-2">Error loading posts</div>
+          <div class="text-sm text-muted-foreground">{error.message}</div>
+          {#if error.message.includes("Unauthorized")}
+            <a
+              href="/auth/sign-in"
+              class="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 mt-3"
+            >
+              Sign In to View Posts
+            </a>
           {/if}
+        </div>
+      {:else if posts && posts.length === 0}
+        <div class="p-4 text-center">
+          <div class="text-muted-foreground">No posts found</div>
+        </div>
+      {:else if posts}
+        <div>
+          {#each posts as post (post.id)}
+            <PostCard {post} />
+          {/each}
         </div>
       {/if}
     </div>

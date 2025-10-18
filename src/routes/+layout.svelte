@@ -1,16 +1,22 @@
 <script lang="ts">
-	import "../app.css";
-	import favicon from "$lib/assets/favicon.svg";
+  import "../app.css";
+  import favicon from "$lib/assets/favicon.svg";
+  import { QueryClientProvider } from "@tanstack/svelte-query";
+  import type { LayoutProps } from "./$types";
+   import { Toaster } from "$lib/components/ui/sonner/index.js";
 
-	let { children } = $props();
+  let { data, children }: LayoutProps = $props();
 </script>
 
 <svelte:head>
-	<link rel="icon" href={favicon} />
+  <link rel="icon" href={favicon} />
 </svelte:head>
 
 <div>
-	<main class="mx-auto antialiased">
-		{@render children?.()}
-	</main>
+  <QueryClientProvider client={data.queryClient}>
+    <main class="mx-auto antialiased">
+      {@render children()}
+    </main>
+    <Toaster />
+  </QueryClientProvider>
 </div>

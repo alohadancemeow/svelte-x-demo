@@ -40,6 +40,7 @@
           heading: false,
           codeBlock: false,
           horizontalRule: false,
+          link: false, // Disable default link to avoid duplicate
         }),
         BubbleMenu.configure({
           element: bubbleMenu as HTMLElement | null | undefined,

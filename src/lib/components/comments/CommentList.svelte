@@ -1,7 +1,7 @@
 <script lang="ts">
   import { ChevronDownIcon, ChevronUpIcon, Loader2Icon } from "@lucide/svelte";
   import { Button } from "$lib/components/ui/button/index.js";
-  import CommentCard from "$lib/components/post/CommentCard.svelte";
+  import CommentCard from "$lib/components/comments/CommentCard.svelte";
   import type { PageData } from "../../../routes/$types";
 
   interface CommentListProps {

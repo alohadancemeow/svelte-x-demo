@@ -9,10 +9,11 @@
   import * as Avatar from "$lib/components/ui/avatar/index.js";
   import * as DropdownMenu from "$lib/components/ui/dropdown-menu/index.js";
   import { Button } from "$lib/components/ui/button/index.js";
-  import CommentForm from "$lib/components/post/CommentForm.svelte";
+  import CommentForm from "$lib/components/comments/CommentForm.svelte";
   import { cn } from "$lib/utils";
   import type { PageData } from "../../../routes/$types";
   import { authClient } from "$lib/auth-client";
+  import { createQuery } from "@tanstack/svelte-query";
 
   interface CommentCardProps {
     comment: PageData["posts"][0]["comments"][0];
@@ -33,6 +34,11 @@
   let showReplyForm = $state(false);
   let likeComment = { isPending: false } as { isPending: boolean };
   const isAuthor = comment.authorId === $session?.data?.user?.id;
+
+  // const { data, error, isPending } = createQuery<PageData["posts"][0]>(() => ({
+  //   queryKey: ["post-comment", comment.postId],
+  //   // queryFn: () => likeComment(comment.postId),
+  // }));
 
   const handleLike = async () => {
     // try {

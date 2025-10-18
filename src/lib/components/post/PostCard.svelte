@@ -14,42 +14,108 @@
   import * as DropdownMenu from "$lib/components/ui/dropdown-menu/index.js";
   import { Button } from "$lib/components/ui/button/index.js";
   import { cn } from "$lib/utils";
-  // import { toast } from "sonner";
-  import CommentForm from "$lib/components/post/CommentForm.svelte";
-  import CommentList from "$lib/components/post/CommentList.svelte";
-  import type { PageData, PageProps } from "../../../routes/$types";
+  import { toast } from "svelte-sonner";
+  import CommentForm from "$lib/components/comments/CommentForm.svelte";
+  import CommentList from "$lib/components/comments/CommentList.svelte";
+  import type { PageData } from "../../../routes/$types";
   import { authClient } from "$lib/auth-client";
+  import { createMutation, useQueryClient } from "@tanstack/svelte-query";
+  import { invalidateAll } from "$app/navigation";
 
   type PostCardProps = {
-    post: PageData["posts"][0];
+    // post: PageData["posts"][0];
+    post: any;
   };
 
   let { post }: PostCardProps = $props();
-  $inspect(post, "post");
-
   const session = authClient.useSession();
+  const client = useQueryClient();
+  const isAuthor = $session?.data?.user.id === post.authorId;
 
   let showComments = $state(true);
   let isImageExpanded = $state(false);
 
-  let likePost = { isPending: false } as { isPending: boolean };
-  const isAuthor = $session?.data?.user.id === post.authorId;
+  const endpoint = `/api/posts/${post.id}/like`;
 
-  const handleLike = async () => {
-    // try {
-    //     await likePost.mutateAsync(post.id);
-    // } catch (error) {
-    //     console.error(error);
-    //     toast.error("Failed to like post");
-    // }
-  };
+  const likeMutation = createMutation(() => ({
+    mutationFn: async () =>
+      await fetch(endpoint, { method: "POST" }).then((r) => r.json()),
+    onMutate: async (variables: { postId: string }) => {
+      // Cancel any outgoing refetches (so they don't overwrite our optimistic update)
+      await client.cancelQueries({ queryKey: ["posts"] });
+
+      // Snapshot the previous value
+      const previousPosts = client.getQueryData(["posts"]);
+
+      // Optimistically update to the new value
+      if (previousPosts && $session.data?.user?.id) {
+        const currentUserId = $session.data.user.id;
+
+        if (Array.isArray(previousPosts)) {
+          const updatedPosts = previousPosts.map((p: any) => {
+            if (p.id === variables.postId) {
+              // Check if user already liked this post
+              const userHasLiked = p.likes?.some(
+                (like: any) => like.userId === currentUserId
+              );
+
+              if (userHasLiked) {
+                // Remove the like optimistically
+                return {
+                  ...p,
+                  likes: p.likes.filter(
+                    (like: any) => like.userId !== currentUserId
+                  ),
+                };
+              } else {
+                // Add the like optimistically
+                const newLike = {
+                  id: crypto.randomUUID(), // Temporary ID
+                  postId: variables.postId,
+                  userId: currentUserId,
+                  createdAt: new Date(),
+                  updatedAt: new Date(),
+                };
+                return {
+                  ...p,
+                  likes: [...(p.likes || []), newLike],
+                };
+              }
+            }
+            return p;
+          });
+
+          client.setQueryData(["posts"], updatedPosts);
+        }
+      }
+
+      // Return a context object with the snapshotted value
+      return { previousPosts };
+    },
+    onError: (error, variables, context) => {
+      // Rollback to previous state on error
+      if (context?.previousPosts) {
+        client.setQueryData(["posts"], context.previousPosts);
+      }
+      console.error(error);
+      toast.error("Failed to like post");
+    },
+    onSettled: async () => {
+      // Only invalidate once, after everything is settled
+      await client.invalidateQueries({ queryKey: ["posts"] });
+    },
+  }));
+
+  $inspect(likeMutation.data, "likeMutation");
+
+  const privacyMap = {
+    public: Globe2Icon,
+    followers: Users2Icon,
+    private: LockIcon,
+  } as const;
 
   const PrivacyIcon =
-    {
-      public: Globe2Icon,
-      followers: Users2Icon,
-      private: LockIcon,
-    }[post.privacy || "public"] || Globe2Icon;
+    privacyMap[post.privacy as keyof typeof privacyMap] ?? Globe2Icon;
 </script>
 
 <div class="p-4 space-y-4">
@@ -173,16 +239,22 @@
       <!-- Post Actions -->
       <div class="flex items-center gap-2 mt-4">
         <button
-          onclick={handleLike}
-          disabled={likePost.isPending}
-          class="group flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-accent hover:bg-accent/80 transition-all duration-200 hover:px-4"
+          onclick={() => {
+            console.log("Like button clicked for post:", post.id);
+            console.log("Current session:", $session.data);
+            console.log("Post likes:", post.likes);
+            likeMutation.mutate({ postId: post.id });
+            // likeMutation.mutate();
+          }}
+          disabled={likeMutation.isPending}
+          class="group cursor-pointer flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-accent hover:bg-accent/80 transition-all duration-200 hover:px-4"
         >
           <HeartIcon
             class={cn(
               "size-4 flex-shrink-0",
-              likePost.isPending && "animate-pulse",
+              likeMutation.isPending && "animate-pulse",
               post.likes?.some(
-                (like) => like.userId === $session.data?.user?.id
+                (like: any) => like.userId === $session.data?.user?.id
               ) && "fill-current text-red-500"
             )}
           />
@@ -190,12 +262,16 @@
           <span
             class="text-sm font-medium max-w-0 overflow-hidden group-hover:max-w-[4rem] transition-all duration-200 whitespace-nowrap"
           >
-            Like
+            {post?.likes?.some(
+              (like: any) => like.userId === $session.data?.user?.id
+            )
+              ? "Liked"
+              : "Like"}
           </span>
         </button>
         <!-- onclick={() => setShowComments(!showComments)} -->
         <button
-          class="group flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-accent hover:bg-accent/80 transition-all duration-200 hover:px-4"
+          class="group cursor-pointer flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-accent hover:bg-accent/80 transition-all duration-200 hover:px-4"
         >
           <MessageCircleIcon class={"size-4 flex-shrink-0"} />
           <span class="text-sm font-medium">
