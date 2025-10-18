@@ -21,16 +21,19 @@
     return response.posts; // Extract the posts array from the response
   };
 
-  const {
-    data: posts,
-    error,
-    isLoading,
-  } = createQuery(() => ({
+  const postsQuery = createQuery(() => ({
     queryKey: ["posts"],
     queryFn: fetchPosts,
-    refetchInterval: intervalMs, // Refetch every second
+    refetchInterval: intervalMs,
+    refetchOnWindowFocus: true, // Refetch when user returns to tab
+    staleTime: 30000, // Consider data fresh for 30 seconds
     // initialData: data?.posts || [], // Server load data is already in the correct format
   }));
+
+  // Extract reactive values
+  const posts = $derived(postsQuery.data);
+  const error = $derived(postsQuery.error);
+  const isLoading = $derived(postsQuery.isLoading);
 </script>
 
 <div class="max-w-3xl mx-auto mt-6">

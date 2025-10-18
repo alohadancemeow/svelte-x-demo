@@ -20,7 +20,6 @@
   import type { PageData } from "../../../routes/$types";
   import { authClient } from "$lib/auth-client";
   import { createMutation, useQueryClient } from "@tanstack/svelte-query";
-  import { invalidateAll } from "$app/navigation";
 
   type PostCardProps = {
     // post: PageData["posts"][0];
@@ -38,8 +37,11 @@
   const endpoint = `/api/posts/${post.id}/like`;
 
   const likeMutation = createMutation(() => ({
-    mutationFn: async () =>
-      await fetch(endpoint, { method: "POST" }).then((r) => r.json()),
+    mutationFn: async () => {
+      const response = await fetch(endpoint, { method: "POST" });
+      const data = await response.json();
+      return data;
+    },
     onMutate: async (variables: { postId: string }) => {
       // Cancel any outgoing refetches (so they don't overwrite our optimistic update)
       await client.cancelQueries({ queryKey: ["posts"] });
@@ -106,7 +108,7 @@
     },
   }));
 
-  $inspect(likeMutation.data, "likeMutation");
+  // $inspect(likeMutation.data, "likeMutation");
 
   const privacyMap = {
     public: Globe2Icon,
@@ -240,11 +242,7 @@
       <div class="flex items-center gap-2 mt-4">
         <button
           onclick={() => {
-            console.log("Like button clicked for post:", post.id);
-            console.log("Current session:", $session.data);
-            console.log("Post likes:", post.likes);
             likeMutation.mutate({ postId: post.id });
-            // likeMutation.mutate();
           }}
           disabled={likeMutation.isPending}
           class="group cursor-pointer flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-accent hover:bg-accent/80 transition-all duration-200 hover:px-4"
