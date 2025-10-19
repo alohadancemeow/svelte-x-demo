@@ -9,10 +9,10 @@
   import { createQuery } from "@tanstack/svelte-query";
   import type { PostsWithInfo } from "$lib/zod-schemas";
 
-  let { data }: PageProps = $props();
+  let { data, form }: PageProps = $props();
   const session = authClient.useSession();
   let feedType = $state("following");
-  let intervalMs = $state(1000);
+  // let intervalMs = $state(1000);
 
   const endpoint = "/api/posts";
 
@@ -24,10 +24,10 @@
   const postsQuery = createQuery(() => ({
     queryKey: ["posts"],
     queryFn: fetchPosts,
-    refetchInterval: intervalMs,
+    // refetchInterval: intervalMs,
     refetchOnWindowFocus: true, // Refetch when user returns to tab
     staleTime: 30000, // Consider data fresh for 30 seconds
-    // initialData: data?.posts || [], // Server load data is already in the correct format
+    initialData: data?.posts || [], // Server load data is already in the correct format
   }));
 
   // Extract reactive values

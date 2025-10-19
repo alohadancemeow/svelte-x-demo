@@ -17,13 +17,12 @@
   import { toast } from "svelte-sonner";
   import CommentForm from "$lib/components/comments/CommentForm.svelte";
   import CommentList from "$lib/components/comments/CommentList.svelte";
-  import type { PageData } from "../../../routes/$types";
+  import type { PostWithInfo } from "$lib/zod-schemas";
   import { authClient } from "$lib/auth-client";
   import { createMutation, useQueryClient } from "@tanstack/svelte-query";
 
   type PostCardProps = {
-    // post: PageData["posts"][0];
-    post: any;
+    post: PostWithInfo;
   };
 
   let { post }: PostCardProps = $props();
@@ -31,7 +30,7 @@
   const client = useQueryClient();
   const isAuthor = $session?.data?.user.id === post.authorId;
 
-  let showComments = $state(true);
+  let showComments = $state(false);
   let isImageExpanded = $state(false);
 
   const endpoint = `/api/posts/${post.id}/like`;
@@ -267,8 +266,8 @@
               : "Like"}
           </span>
         </button>
-        <!-- onclick={() => setShowComments(!showComments)} -->
         <button
+          onclick={() => (showComments = !showComments)}
           class="group cursor-pointer flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-accent hover:bg-accent/80 transition-all duration-200 hover:px-4"
         >
           <MessageCircleIcon class={"size-4 flex-shrink-0"} />

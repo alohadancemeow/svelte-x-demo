@@ -94,7 +94,7 @@ export const verification = sqliteTable("verification", {
  * Stores user posts with content, images, privacy settings, and mood
  */
 export const post = sqliteTable("post", {
-	id: text("id").primaryKey(),
+	id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
 	image: text("image"),
 	content: text("content"),
 	privacy: text("privacy").default("public"),
@@ -111,7 +111,7 @@ export const post = sqliteTable("post", {
  * Tracks which users liked which posts (many-to-many relationship)
  */
 export const like = sqliteTable("like", {
-	id: text("id").primaryKey(),
+	id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
 	postId: text("post_id")
 		.notNull()
 		.references(() => post.id, { onDelete: "cascade" }),
@@ -149,7 +149,7 @@ export const comment = sqliteTable("comment", {
  * Tracks which users liked which comments (many-to-many relationship)
  */
 export const commentLike = sqliteTable("comment_like", {
-	id: text("id").primaryKey(),
+	id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
 	commentId: text("comment_id")
 		.notNull()
 		.references(() => comment.id, { onDelete: "cascade" }),

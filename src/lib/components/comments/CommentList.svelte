@@ -3,9 +3,10 @@
   import { Button } from "$lib/components/ui/button/index.js";
   import CommentCard from "$lib/components/comments/CommentCard.svelte";
   import type { PageData } from "../../../routes/$types";
+  import type { CommentsWithInfo } from "$lib/zod-schemas";
 
   interface CommentListProps {
-    comments: PageData["posts"][0]["comments"][0][];
+    comments: CommentsWithInfo;
     depth?: number;
   }
 
@@ -70,13 +71,9 @@
             <ChevronUpIcon class="mr-1.5 size-4" />
             Hide {comment._count.replies}
             {comment._count.replies === 1 ? "reply" : "replies"}
-          </Button> -->
-      <!-- <CommentList
-                                {postId}
-                                parentId={comment.id}
-                                depth={depth + 1}
-                            /> -->
-      <!-- {/if}
+          </Button>
+          <CommentList {postId} parentId={comment.id} depth={depth + 1} />
+        {/if}
       {/if} -->
     </div>
   {/each}

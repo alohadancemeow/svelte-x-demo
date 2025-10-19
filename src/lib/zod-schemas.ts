@@ -17,12 +17,17 @@ export type Like = z.infer<typeof selectLikeSchema>;
 export type CommentLike = z.infer<typeof selectCommentLikeSchema>;
 
 // Complex schema for posts with nested relations
+
+export const commentWithInfoSchema = selectCommentSchema.extend({
+    author: selectUserSchema,
+    likes: z.array(selectCommentLikeSchema)
+});
+
+export const commentsWithInfoSchema = z.array(commentWithInfoSchema);
+
 export const postWithInfoSchema = selectPostSchema.extend({
     author: selectUserSchema,
-    comments: z.array(selectCommentSchema.extend({
-        author: selectUserSchema,
-        likes: z.array(selectCommentLikeSchema)
-    })),
+    comments: commentsWithInfoSchema,
     likes: z.array(selectLikeSchema)
 });
 
@@ -31,3 +36,5 @@ export const postsWithInfoSchema = z.array(postWithInfoSchema);
 // TypeScript type for posts with nested relations
 export type PostWithInfo = z.infer<typeof postWithInfoSchema>;
 export type PostsWithInfo = z.infer<typeof postsWithInfoSchema>;
+export type CommentWithInfo = z.infer<typeof commentWithInfoSchema>;
+export type CommentsWithInfo = z.infer<typeof commentsWithInfoSchema>;

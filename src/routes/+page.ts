@@ -1,4 +1,4 @@
-import type { PageLoad } from './$types';
+import type { PageLoad } from "./$types";
 
 export const load: PageLoad = async ({ fetch, parent }) => {
     const { queryClient } = await parent();
@@ -32,4 +32,3 @@ export const load: PageLoad = async ({ fetch, parent }) => {
         return { posts: [] };
     }
 };
-

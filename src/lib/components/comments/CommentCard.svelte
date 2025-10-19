@@ -14,9 +14,10 @@
   import type { PageData } from "../../../routes/$types";
   import { authClient } from "$lib/auth-client";
   import { createQuery } from "@tanstack/svelte-query";
+  import type { CommentWithInfo } from "$lib/zod-schemas";
 
   interface CommentCardProps {
-    comment: PageData["posts"][0]["comments"][0];
+    comment: CommentWithInfo;
     depth?: number;
     maxDepth?: number;
     isPending?: boolean;
