@@ -2,23 +2,39 @@
   import { ChevronDownIcon, ChevronUpIcon, Loader2Icon } from "@lucide/svelte";
   import { Button } from "$lib/components/ui/button/index.js";
   import CommentCard from "$lib/components/comments/CommentCard.svelte";
-  import type { PageData } from "../../../routes/$types";
   import type { CommentsWithInfo } from "$lib/zod-schemas";
+  import { createQuery } from "@tanstack/svelte-query";
 
   interface CommentListProps {
-    comments: CommentsWithInfo;
     depth?: number;
+    postId: string;
   }
 
-  let { comments, depth = 0 }: CommentListProps = $props();
-  let showReplies = $state(false);
+  let { depth = 0, postId }: CommentListProps = $props();
 
-  const isLoading = false;
-  const isError = false;
   const refetch = () => {};
-  const fetchNextPage = () => {};
-  const hasNextPage = false;
-  const isFetchingNextPage = false;
+  // const fetchNextPage = () => {};
+  // const hasNextPage = false;
+  // const isFetchingNextPage = false;
+
+  const endpoint = `/api/posts/${postId}/comments`;
+
+  const fetchRootComments = async (): Promise<CommentsWithInfo> => {
+    const response = await fetch(endpoint).then((res) => res.json());
+    return response.comments;
+  };
+
+  const query = createQuery(() => ({
+    queryKey: ["root-comments", postId],
+    queryFn: fetchRootComments,
+  }));
+
+  // Extract reactive values
+  const rootComments = $derived(query.data);
+  const error = $derived(query.error);
+  const isLoading = $derived(query.isLoading);
+
+  // $inspect(rootComments, "rootComments");
 </script>
 
 {#if isLoading}
@@ -28,7 +44,7 @@
       <p>Loading comments...</p>
     </div>
   </div>
-{:else if isError}
+{:else if error}
   <div class="flex justify-center py-4">
     <div class="flex items-center gap-2 text-sm text-muted-foreground">
       <p>Failed to load comments</p>
@@ -37,49 +53,20 @@
       </Button>
     </div>
   </div>
-{:else if !comments}
+{:else if !rootComments}
   <div class="flex justify-center py-4">
     <p class="text-sm text-muted-foreground">No comments found</p>
   </div>
-{/if}
+{:else}
+  <div>
+    {#each rootComments as comment (comment.id)}
+      <div>
+        <CommentCard {comment} />
+      </div>
+    {/each}
 
-<div>
-  {#each comments as comment (comment.id)}
-    <div>
-      <CommentCard {comment} />
-      <!-- {#if comment._count.replies > 0}
-        {#if !showReplies}
-          <Button
-            variant="ghost"
-            size="sm"
-            class="ml-[16px] h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
-            style="margin-left: {(depth + 1) * 16}px"
-            onclick={() => (showReplies = true)}
-          >
-            <ChevronDownIcon class="size-4" />
-            Show {comment._count.replies}
-            {comment._count.replies === 1 ? "reply" : "replies"}
-          </Button>
-        {:else}
-          <Button
-            variant="ghost"
-            size="sm"
-            class="ml-[16px] h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
-            style="margin-left: {(depth + 1) * 16}px"
-            onclick={() => (showReplies = false)}
-          >
-            <ChevronUpIcon class="mr-1.5 size-4" />
-            Hide {comment._count.replies}
-            {comment._count.replies === 1 ? "reply" : "replies"}
-          </Button>
-          <CommentList {postId} parentId={comment.id} depth={depth + 1} />
-        {/if}
-      {/if} -->
-    </div>
-  {/each}
-
-  <!-- Show more button -->
-  {#if hasNextPage}
+    <!-- Show more button -->
+    <!-- {#if hasNextPage}
     <div class="flex justify-center py-2">
       <Button
         variant="ghost"
@@ -97,5 +84,6 @@
         {/if}
       </Button>
     </div>
-  {/if}
-</div>
+  {/if} -->
+  </div>
+{/if}

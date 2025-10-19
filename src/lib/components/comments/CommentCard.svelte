@@ -9,9 +9,9 @@
   import * as Avatar from "$lib/components/ui/avatar/index.js";
   import * as DropdownMenu from "$lib/components/ui/dropdown-menu/index.js";
   import { Button } from "$lib/components/ui/button/index.js";
-  import CommentForm from "$lib/components/comments/CommentForm.svelte";
+  import ReplyCard from "$lib/components/comments/ReplyCard.svelte";
+  import ReplyItem from "$lib/components/comments/ReplyItem.svelte";
   import { cn } from "$lib/utils";
-  import type { PageData } from "../../../routes/$types";
   import { authClient } from "$lib/auth-client";
   import { createQuery } from "@tanstack/svelte-query";
   import type { CommentWithInfo } from "$lib/zod-schemas";
@@ -20,26 +20,45 @@
     comment: CommentWithInfo;
     depth?: number;
     maxDepth?: number;
-    isPending?: boolean;
   }
 
-  let {
-    comment,
-    depth = 0,
-    maxDepth = 6,
-    isPending = false,
-  }: CommentCardProps = $props();
+  let { comment, depth = 0, maxDepth = 6 }: CommentCardProps = $props();
 
   const session = authClient.useSession();
 
   let showReplyForm = $state(false);
+  let showReplies = $state(false);
   let likeComment = { isPending: false } as { isPending: boolean };
   const isAuthor = comment.authorId === $session?.data?.user?.id;
 
-  // const { data, error, isPending } = createQuery<PageData["posts"][0]>(() => ({
-  //   queryKey: ["post-comment", comment.postId],
-  //   // queryFn: () => likeComment(comment.postId),
-  // }));
+  const endpoint = `/api/comments/${comment.id}/replies`;
+
+  const fetchReplies = async (): Promise<CommentWithInfo[]> => {
+    try {
+      const response = await fetch(endpoint);
+      if (!response.ok) {
+        console.error(`Failed to fetch replies: ${response.status}`);
+        return [];
+      }
+      const data = await response.json();
+      return data.replies || [];
+    } catch (error) {
+      console.error("Error fetching replies:", error);
+      return [];
+    }
+  };
+
+  const query = createQuery(() => ({
+    queryKey: ["comment-replies", comment.id],
+    queryFn: fetchReplies,
+  }));
+
+  // Extract reactive values
+  const replies = $derived(query.data);
+  const error = $derived(query.error);
+  const isLoading = $derived(query.isLoading);
+
+  // $inspect(replies, "replies");
 
   const handleLike = async () => {
     // try {
@@ -61,7 +80,7 @@
   <div
     class={cn(
       "relative space-y-2 py-2 transition-opacity",
-      isPending && "opacity-50"
+      isLoading && "opacity-50"
     )}
   >
     <div class="flex items-center gap-2">
@@ -75,7 +94,7 @@
         <p class="text-sm font-medium">{comment.author.name}</p>
       </a>
       <span class="text-xs text-muted-foreground">
-        {#if isPending}
+        {#if isLoading}
           <span class="flex items-center gap-1">
             <Loader2Icon class="size-4 animate-spin" />
             <span>Pending</span>
@@ -84,7 +103,7 @@
           {formatDistanceToNow(new Date(comment.createdAt))} ago
         {/if}
       </span>
-      {#if isAuthor && !isPending}
+      {#if isAuthor && !isLoading}
         <DropdownMenu.Root>
           <DropdownMenu.Trigger>
             <Button
@@ -115,32 +134,64 @@
           ) && "text-red-500 hover:text-red-500"
         )}
         onclick={handleLike}
-        disabled={likeComment.isPending || isPending}
+        disabled={likeComment.isPending || isLoading}
       >
         <HeartIcon />
         <span>{comment.likes.length}</span>
       </Button>
-      {#if depth < maxDepth && !isPending}
+
+      {#if depth < maxDepth && !isLoading}
+        {#if replies && replies.length > 0}
+          <Button
+            variant="ghost"
+            size="sm"
+            class="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
+            onclick={() => {
+              showReplies = !showReplies;
+              showReplyForm = false;
+            }}
+          >
+            <MessageCircleIcon />
+            <span>{replies.length}</span>
+            <span class="ml-1">
+              {showReplies ? "Hide" : "Show"} replies
+            </span>
+          </Button>
+        {/if}
+
         <Button
           variant="ghost"
           size="sm"
           class="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
           onclick={() => (showReplyForm = !showReplyForm)}
         >
-          <MessageCircleIcon />
-          <!-- <span>{comment.comments.length}</span> -->
-          <span>Reply count</span>
+          Reply
         </Button>
       {/if}
     </div>
 
     {#if showReplyForm}
-      <div class="pt-2">
-        <CommentForm
-          postId={comment.postId}
-          parentId={comment.id}
-          onSuccess={() => (showReplyForm = false)}
-        />
+      <ReplyCard
+        postId={comment.postId}
+        parentId={comment.id}
+        {depth}
+        authorName={comment.author.name}
+        onCancel={() => (showReplyForm = false)}
+        onSuccess={() => {
+          showReplyForm = false;
+          showReplies = true;
+        }}
+      />
+    {/if}
+
+    <!-- Display replies -->
+    {#if showReplies && replies && replies.length > 0}
+      <div class="mt-3 space-y-2">
+        {#each replies as reply (reply.id)}
+          <div class="border-l-2 border-muted pl-3">
+            <ReplyItem commentParentId={comment.id} comment={reply} />
+          </div>
+        {/each}
       </div>
     {/if}
   </div>

@@ -285,7 +285,7 @@
       {#if showComments}
         <div class="mt-4">
           <CommentForm postId={post.id} />
-          <CommentList comments={post.comments} />
+          <CommentList postId={post.id} />
         </div>
       {/if}
     </div>

@@ -11,10 +11,11 @@
     postId: string;
     parentId?: string;
     onSuccess?: () => void;
+    mentionText?: string;
   }
 
-  let { postId, parentId, onSuccess }: CommentFormProps = $props();
-  let content = $state("");
+  let { postId, parentId, onSuccess, mentionText }: CommentFormProps = $props();
+  let content = $state(mentionText ? `@${mentionText} ` : "");
   let isFocused = $state(false);
   let isPending = $state(false);
 
@@ -73,7 +74,7 @@
     >
       <Textarea
         name="content"
-        placeholder={parentId ? "Add a reply" : "Add a comment"}
+        placeholder={mentionText ? `Mention @${mentionText} in your comment...` : parentId ? "Add a reply" : "Add a comment"}
         bind:value={content}
         onfocus={() => (isFocused = true)}
         onblur={() => !content.trim() && (isFocused = false)}
