@@ -15,6 +15,8 @@
   import type { CommentWithInfo } from "$lib/zod-schemas";
   import { enhance } from "$app/forms";
   import { useQueryClient } from "@tanstack/svelte-query";
+  import { toast } from "svelte-sonner";
+  import { goto } from "$app/navigation";
 
   interface ReplyItemProps {
     commentParentId: string;
@@ -103,8 +105,24 @@
 
                 await update();
               } else {
-                console.log(result, "likeComment error");
                 likeCommentPending = false;
+                console.log(result, "likeComment error");
+
+                // Handle different error status codes
+                if (result?.status === 401) {
+                  toast.error("Please sign in to interact with posts", {
+                    action: {
+                      label: "Sign In",
+                      onClick: () => {
+                        goto("/auth/sign-in");
+                      },
+                    },
+                  });
+                } else if (result?.status === 404) {
+                  toast.error("Comment not found");
+                } else {
+                  toast.error("Failed to like comment");
+                }
               }
             };
           }}
@@ -114,7 +132,7 @@
             type="submit"
             variant="ghost"
             size="sm"
-            class="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
+            class="h-6 !pl-0 text-xs text-muted-foreground hover:text-foreground"
             disabled={likeCommentPending}
           >
             {#if likeCommentPending}
@@ -171,6 +189,7 @@
                   return async ({ result, update }) => {
                     if (result?.status === 200) {
                       isPending = false;
+                      toast.success("Comment deleted successfully");
 
                       // Invalidate root comments for the post
                       await client.invalidateQueries({
@@ -191,8 +210,28 @@
 
                       await update();
                     } else {
-                      console.log(result, "deleteComment error");
                       isPending = false;
+                      console.log(result, "deleteComment error");
+
+                      // Handle different error status codes
+                      if (result?.status === 401) {
+                        toast.error("Please sign in to delete comments", {
+                          action: {
+                            label: "Sign In",
+                            onClick: () => {
+                              goto("/auth/sign-in");
+                            },
+                          },
+                        });
+                      } else if (result?.status === 403) {
+                        toast.error(
+                          "You don't have permission to delete this comment"
+                        );
+                      } else if (result?.status === 404) {
+                        toast.error("Comment not found");
+                      } else {
+                        toast.error("Failed to delete comment");
+                      }
                     }
                   };
                 }}

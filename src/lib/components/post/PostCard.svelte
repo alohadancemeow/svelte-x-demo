@@ -20,6 +20,7 @@
   import type { PostWithInfo } from "$lib/zod-schemas";
   import { authClient } from "$lib/auth-client";
   import { createMutation, useQueryClient } from "@tanstack/svelte-query";
+  import { goto } from "$app/navigation";
 
   type PostCardProps = {
     post: PostWithInfo;
@@ -38,6 +39,17 @@
   const likeMutation = createMutation(() => ({
     mutationFn: async () => {
       const response = await fetch(endpoint, { method: "POST" });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        const error = new Error(
+          errorData.error || `HTTP error! status: ${response.status}`
+        );
+        // Add status code to error for specific handling
+        (error as any).status = response.status;
+        throw error;
+      }
+
       const data = await response.json();
       return data;
     },
@@ -99,7 +111,20 @@
         client.setQueryData(["posts"], context.previousPosts);
       }
       console.error(error);
-      toast.error("Failed to like post");
+
+      // Check if it's a 401 Unauthorized error
+      if ((error as any).status === 401) {
+        toast.error("Please sign in to interact with posts", {
+          action: {
+            label: "Sign In",
+            onClick: () => {
+              goto("/auth/sign-in");
+            }
+          }
+        });
+      } else {
+        toast.error("Failed to like post");
+      }
     },
     onSettled: async () => {
       // Only invalidate once, after everything is settled

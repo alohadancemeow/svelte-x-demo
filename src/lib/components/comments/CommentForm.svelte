@@ -7,6 +7,8 @@
   import { enhance } from "$app/forms";
   import { page } from "$app/state";
   import { useQueryClient } from "@tanstack/svelte-query";
+  import { toast } from "svelte-sonner";
+  import { goto } from "$app/navigation";
 
   interface CommentFormProps {
     postId: string;
@@ -25,10 +27,6 @@
 
   // $inspect(content);
 </script>
-
-{#if !$session?.data?.user}
-  <div>Please login to comment</div>
-{/if}
 
 {#if page.form?.error === 400}
   <p class="error">{page.form.error}</p>
@@ -57,6 +55,7 @@
         content = "";
         isFocused = false;
         isPending = false;
+        toast.success("Comment posted successfully");
 
         // Invalidate queries to trigger real-time updates
         await client.invalidateQueries({
@@ -82,8 +81,26 @@
 
         await update();
       } else {
-        console.log(result, "createComment error");
         isPending = false;
+        console.log(result, "createComment error");
+
+        // Handle different error status codes
+        if (result?.status === 401) {
+          toast.error("Please sign in to comment", {
+            action: {
+              label: "Sign In",
+              onClick: () => {
+                goto("/auth/sign-in");
+              },
+            },
+          });
+        } else if (result?.status === 400) {
+          toast.error("Invalid comment content");
+        } else if (result?.status === 404) {
+          toast.error("Post not found");
+        } else {
+          toast.error("Failed to create comment");
+        }
       }
     };
   }}
@@ -95,19 +112,25 @@
   </Avatar.Root>
   <div class="flex-1">
     <div
-      class="overflow-hidden rounded-lg border bg-background transition-shadow focus-within:ring-2 focus-within:ring-ring"
+      class="overflow-hidden rounded-lg border bg-background transition-shadow focus-within:ring-2 focus-within:ring-ring relative"
     >
       <Textarea
         name="content"
-        placeholder={mentionText
-          ? `Mention @${mentionText} in your comment...`
-          : parentId
-            ? "Add a reply"
-            : "Add a comment"}
+        placeholder={!$session?.data?.user
+          ? "Sign in to comment"
+          : mentionText
+            ? `Mention @${mentionText} in your comment...`
+            : parentId
+              ? "Add a reply"
+              : "Add a comment"}
         bind:value={content}
         onfocus={() => (isFocused = true)}
         onblur={() => !content.trim() && (isFocused = false)}
-        class="w-full resize-none min-h-[2.5rem] border-0 bg-transparent px-3 py-2 focus:outline-none"
+        disabled={!$session?.data?.user}
+        class="w-full resize-none min-h-[2.5rem] border-0 bg-transparent px-3 py-2 focus:outline-none {!$session
+          ?.data?.user
+          ? 'cursor-pointer'
+          : ''}"
       />
 
       <!-- Show character count and submit button when focused or content exists -->
@@ -121,11 +144,13 @@
           <Button
             type="submit"
             size="sm"
-            disabled={!content.trim()}
+            disabled={!content.trim() || !$session?.data?.user}
             class="h-8 text-xs cursor-pointer"
           >
             {#if isPending}
               <Loader2Icon class="size-4 animate-spin" />
+            {:else if !$session?.data?.user}
+              Sign in to {parentId ? "reply" : "comment"}
             {:else if parentId}
               Reply
             {:else}
