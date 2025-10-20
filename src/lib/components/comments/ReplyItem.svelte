@@ -189,7 +189,6 @@
                   return async ({ result, update }) => {
                     if (result?.status === 200) {
                       isPending = false;
-                      toast.success("Comment deleted successfully");
 
                       // Invalidate root comments for the post
                       await client.invalidateQueries({

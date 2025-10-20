@@ -5,7 +5,6 @@
     LockIcon,
     MessageCircleIcon,
     MoreHorizontal,
-    Smile,
     SmileIcon,
     Users2Icon,
   } from "@lucide/svelte";
@@ -29,10 +28,10 @@
   let { post }: PostCardProps = $props();
   const session = authClient.useSession();
   const client = useQueryClient();
-  const isAuthor = $session?.data?.user.id === post.authorId;
 
   let showComments = $state(false);
   let isImageExpanded = $state(false);
+  const isAuthor = $derived($session?.data?.user.id === post.authorId);
 
   const endpoint = `/api/posts/${post.id}/like`;
 
@@ -119,8 +118,8 @@
             label: "Sign In",
             onClick: () => {
               goto("/auth/sign-in");
-            }
-          }
+            },
+          },
         });
       } else {
         toast.error("Failed to like post");
