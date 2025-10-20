@@ -6,6 +6,7 @@
   import { authClient } from "$lib/auth-client";
   import { enhance } from "$app/forms";
   import { page } from "$app/state";
+  import { useQueryClient } from "@tanstack/svelte-query";
 
   interface CommentFormProps {
     postId: string;
@@ -20,6 +21,7 @@
   let isPending = $state(false);
 
   const session = authClient.useSession();
+  const client = useQueryClient();
 
   // $inspect(content);
 </script>
@@ -35,7 +37,7 @@
 <form
   method="POST"
   action="?/createComment"
-  use:enhance={({ formElement, formData, action, cancel, submitter }) => {
+  use:enhance={({ formData, cancel }) => {
     isPending = true;
 
     // Validation before submission
@@ -51,10 +53,33 @@
 
     return async ({ result, update }) => {
       if (result.type === "success") {
-        console.log(result, "createComment success");
+        // console.log(result, "createComment success");
         content = "";
         isFocused = false;
         isPending = false;
+
+        // Invalidate queries to trigger real-time updates
+        await client.invalidateQueries({
+          queryKey: ["root-comments", postId],
+        });
+
+        // If this is a reply, also invalidate the parent comment's replies
+        if (parentId) {
+          await client.invalidateQueries({
+            queryKey: ["comment-replies", parentId],
+          });
+        }
+
+        // Invalidate posts query to update comment counts
+        await client.invalidateQueries({
+          queryKey: ["posts"],
+        });
+
+        // Call onSuccess callback if provided
+        if (onSuccess) {
+          onSuccess();
+        }
+
         await update();
       } else {
         console.log(result, "createComment error");
@@ -74,7 +99,11 @@
     >
       <Textarea
         name="content"
-        placeholder={mentionText ? `Mention @${mentionText} in your comment...` : parentId ? "Add a reply" : "Add a comment"}
+        placeholder={mentionText
+          ? `Mention @${mentionText} in your comment...`
+          : parentId
+            ? "Add a reply"
+            : "Add a comment"}
         bind:value={content}
         onfocus={() => (isFocused = true)}
         onblur={() => !content.trim() && (isFocused = false)}

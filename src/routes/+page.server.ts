@@ -4,7 +4,7 @@ import { fail, type Actions } from '@sveltejs/kit';
 import { eq } from 'drizzle-orm';
 import z from 'zod';
 import type { PageServerLoad } from './$types';
-import { getCommentsForPost, createComment, createReply, deleteComment } from '$lib/server/db/comments';
+import { getCommentsForPost, createComment, createReply, deleteComment, toggleCommentLike } from '$lib/server/db/comments';
 
 export const load: PageServerLoad = async ({ locals }) => {
     // get all posts
@@ -46,9 +46,9 @@ export const actions = {
 
             const formData = await event.request.formData();
             const result = commentCreateSchema.safeParse(Object.fromEntries(formData));
-            
+
             if (!result.success) {
-                return fail(400, { 
+                return fail(400, {
                     error: 'Invalid comment data',
                     details: result.error.flatten()
                 });
@@ -92,11 +92,11 @@ export const actions = {
 
         } catch (error) {
             console.error('Error creating comment:', error);
-            
+
             if (error instanceof Error) {
                 return fail(400, { error: error.message });
             }
-            
+
             return fail(500, { error: 'Internal server error' });
         }
     },
@@ -123,11 +123,52 @@ export const actions = {
 
         } catch (error) {
             console.error('Error deleting comment:', error);
-            
+
             if (error instanceof Error) {
                 return fail(400, { error: error.message });
             }
-            
+
+            return fail(500, { error: 'Internal server error' });
+        }
+    },
+    likeComment: async (event) => {
+        try {
+            const userId = event.locals.user?.id;
+            if (!userId) {
+                return fail(401, { error: 'Unauthorized' });
+            }
+
+            const formData = await event.request.formData();
+            const commentId = formData.get('commentId') as string;
+
+            if (!commentId) {
+                return fail(400, { error: 'Comment ID is required' });
+            }
+
+            // Verify comment exists
+            const existingComment = await db.query.comment.findFirst({
+                where: (comment, { eq }) => eq(comment.id, commentId),
+            });
+
+            if (!existingComment) {
+                return fail(404, { error: 'Comment not found' });
+            }
+
+            const result = await toggleCommentLike(commentId, userId);
+
+            return {
+                status: 200,
+                result,
+                message: result.action === 'liked' ? 'Comment liked' : 'Comment unliked'
+            };
+
+        } catch (error) {
+            console.error('Error toggling comment like:', error);
+
+            if (error instanceof Error) {
+                return fail(400, { error: error.message });
+            }
+
             return fail(500, { error: 'Internal server error' });
         }
     },

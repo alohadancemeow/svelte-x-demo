@@ -275,9 +275,9 @@
             {post?.comments?.length || 0}
           </span>
           <span
-            class="text-sm font-medium max-w-0 overflow-hidden group-hover:max-w-[4rem] transition-all duration-200 hover:gap-2 hover:px-4"
+            class="text-sm font-medium max-w-0 overflow-hidden group-hover:max-w-[5rem] transition-all duration-200 whitespace-nowrap"
           >
-            Comment
+            {post?.comments?.length === 1 ? "Comment" : "Comments"}
           </span>
         </button>
       </div>

@@ -13,7 +13,8 @@
   import ReplyItem from "$lib/components/comments/ReplyItem.svelte";
   import { cn } from "$lib/utils";
   import { authClient } from "$lib/auth-client";
-  import { createQuery } from "@tanstack/svelte-query";
+  import { enhance } from "$app/forms";
+  import { createQuery, useQueryClient } from "@tanstack/svelte-query";
   import type { CommentWithInfo } from "$lib/zod-schemas";
 
   interface CommentCardProps {
@@ -25,10 +26,12 @@
   let { comment, depth = 0, maxDepth = 6 }: CommentCardProps = $props();
 
   const session = authClient.useSession();
+  const client = useQueryClient();
 
   let showReplyForm = $state(false);
   let showReplies = $state(false);
-  let likeComment = { isPending: false } as { isPending: boolean };
+  let likeCommentPending = $state(false);
+  let isPending = $state(false);
   const isAuthor = comment.authorId === $session?.data?.user?.id;
 
   const endpoint = `/api/comments/${comment.id}/replies`;
@@ -59,14 +62,6 @@
   const isLoading = $derived(query.isLoading);
 
   // $inspect(replies, "replies");
-
-  const handleLike = async () => {
-    // try {
-    //     await likeComment.mutateAsync(comment.id);
-    // } catch (error) {
-    //     console.error(error);
-    // }
-  };
 </script>
 
 <div class="relative pl-[16px]">
@@ -103,19 +98,69 @@
           {formatDistanceToNow(new Date(comment.createdAt))} ago
         {/if}
       </span>
-      {#if isAuthor && !isLoading}
+
+      <!-- Author actions -->
+      {#if isAuthor}
         <DropdownMenu.Root>
           <DropdownMenu.Trigger>
             <Button
               variant="ghost"
               size="icon"
-              class="ml-auto size-6 opacity-0 group-hover:opacity-100 transition-opacity"
+              class="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
             >
               <MoreHorizontal class="size-4" />
             </Button>
           </DropdownMenu.Trigger>
           <DropdownMenu.Content align="end">
-            <DropdownMenu.Item>Delete</DropdownMenu.Item>
+            <form
+              method="POST"
+              action="?/deleteComment"
+              use:enhance={({ formData, cancel }) => {
+                isPending = true;
+
+                if (!comment.id) {
+                  cancel();
+                  return;
+                }
+
+                formData.append("commentId", comment.id);
+
+                return async ({ result, update }) => {
+                  if (result?.status === 200) {
+                    isPending = false;
+
+                    // Invalidate root comments for the post
+                    await client.invalidateQueries({
+                      queryKey: ["root-comments", comment.postId],
+                    });
+
+                    // Invalidate posts query to update comment counts
+                    await client.invalidateQueries({
+                      queryKey: ["posts"],
+                    });
+
+                    await update();
+                  } else {
+                    console.log(result, "deleteComment error");
+                    isPending = false;
+                  }
+                };
+              }}
+            >
+              <DropdownMenu.Item>
+                <button
+                  type="submit"
+                  class="w-full text-left text-destructive cursor-pointer"
+                  disabled={isPending}
+                >
+                  {#if isPending}
+                    Delete...
+                  {:else}
+                    Delete
+                  {/if}
+                </button>
+              </DropdownMenu.Item>
+            </form>
           </DropdownMenu.Content>
         </DropdownMenu.Root>
       {/if}
@@ -124,22 +169,66 @@
     <div class="text-sm">{comment.content}</div>
 
     <div class="flex items-center gap-2">
-      <Button
-        variant="ghost"
-        size="sm"
-        class={cn(
-          "h-6 px-2 text-xs text-muted-foreground hover:text-foreground",
-          comment.likes.some(
-            (like) => like.userId === $session?.data?.user?.id
-          ) && "text-red-500 hover:text-red-500"
-        )}
-        onclick={handleLike}
-        disabled={likeComment.isPending || isLoading}
-      >
-        <HeartIcon />
-        <span>{comment.likes.length}</span>
-      </Button>
+      <!-- Like button -->
+      <form
+        method="POST"
+        action="?/likeComment"
+        use:enhance={({ formData, cancel }) => {
+          likeCommentPending = true;
 
+          if (!comment.id) {
+            cancel();
+            return;
+          }
+
+          formData.append("commentId", comment.id);
+
+          return async ({ result, update }) => {
+            if (result?.status === 200) {
+              likeCommentPending = false;
+
+              // Invalidate root comments for the post to update like counts
+              await client.invalidateQueries({
+                queryKey: ["root-comments", comment.postId],
+              });
+
+              await update();
+            } else {
+              console.log(result, "likeComment error");
+              likeCommentPending = false;
+            }
+          };
+        }}
+        class="inline-block"
+      >
+        <Button
+          type="submit"
+          variant="ghost"
+          size="sm"
+          class={cn(
+            "h-6 px-2 text-xs text-muted-foreground hover:text-foreground",
+            comment.likes.some(
+              (like) => like.userId === $session?.data?.user?.id
+            ) && "text-red-500 hover:text-red-500"
+          )}
+          disabled={likeCommentPending || isLoading}
+        >
+          {#if likeCommentPending}
+            <Loader2Icon class="animate-spin" />
+          {:else}
+            <HeartIcon
+              class={cn(
+                comment.likes.some(
+                  (like) => like.userId === $session?.data?.user?.id
+                ) && "fill-red-500 text-red-500"
+              )}
+            />
+          {/if}
+          <span>{comment.likes.length}</span>
+        </Button>
+      </form>
+
+      <!-- Reply button -->
       {#if depth < maxDepth && !isLoading}
         {#if replies && replies.length > 0}
           <Button

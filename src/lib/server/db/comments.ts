@@ -351,3 +351,50 @@ export async function getCommentStats(commentId: string) {
 		likeCount: likes.length,
 	};
 }
+
+/**
+ * Toggle like on a comment (like if not liked, unlike if already liked)
+ */
+export async function toggleCommentLike(commentId: string, userId: string) {
+	// Check if user already liked this comment
+	const existingLike = await db.query.commentLike.findFirst({
+		where: and(
+			eq(commentLike.commentId, commentId),
+			eq(commentLike.userId, userId)
+		),
+	});
+
+	if (existingLike) {
+		// Unlike: remove the like
+		await db.delete(commentLike).where(
+			and(
+				eq(commentLike.commentId, commentId),
+				eq(commentLike.userId, userId)
+			)
+		);
+		return { action: 'unliked', liked: false };
+	} else {
+		// Like: add a new like
+		await db.insert(commentLike).values({
+			id: crypto.randomUUID(),
+			commentId,
+			userId,
+			createdAt: new Date(),
+			updatedAt: new Date(),
+		});
+		return { action: 'liked', liked: true };
+	}
+}
+
+/**
+ * Check if a user has liked a specific comment
+ */
+export async function hasUserLikedComment(commentId: string, userId: string): Promise<boolean> {
+	const like = await db.query.commentLike.findFirst({
+		where: and(
+			eq(commentLike.commentId, commentId),
+			eq(commentLike.userId, userId)
+		),
+	});
+	return !!like;
+}

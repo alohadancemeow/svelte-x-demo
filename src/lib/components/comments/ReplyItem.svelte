@@ -13,6 +13,8 @@
   import { cn } from "$lib/utils";
   import { authClient } from "$lib/auth-client";
   import type { CommentWithInfo } from "$lib/zod-schemas";
+  import { enhance } from "$app/forms";
+  import { useQueryClient } from "@tanstack/svelte-query";
 
   interface ReplyItemProps {
     commentParentId: string;
@@ -22,9 +24,10 @@
   let { comment, commentParentId }: ReplyItemProps = $props();
 
   const session = authClient.useSession();
-
+  const client = useQueryClient();
+  let isPending = $state(false);
   let showReplyForm = $state(false);
-  let likeComment = { isPending: false } as { isPending: boolean };
+  let likeCommentPending = $state(false);
   const isAuthor = comment.authorId === $session?.data?.user?.id;
 </script>
 
@@ -69,25 +72,65 @@
       <!-- Actions -->
       <div class="mt-2 flex items-center gap-1">
         <!-- Like button -->
-        <Button
-          variant="ghost"
-          size="sm"
-          class="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
-          disabled={likeComment.isPending}
+        <form
+          method="POST"
+          action="?/likeComment"
+          use:enhance={({ formData, cancel }) => {
+            likeCommentPending = true;
+
+            if (!comment.id) {
+              cancel();
+              return;
+            }
+
+            formData.append("commentId", comment.id);
+
+            return async ({ result, update }) => {
+              if (result?.status === 200) {
+                likeCommentPending = false;
+
+                // Invalidate root comments for the post to update like counts
+                await client.invalidateQueries({
+                  queryKey: ["root-comments", comment.postId],
+                });
+
+                // Invalidate parent comment's replies if this is a reply
+                if (commentParentId) {
+                  await client.invalidateQueries({
+                    queryKey: ["comment-replies", commentParentId],
+                  });
+                }
+
+                await update();
+              } else {
+                console.log(result, "likeComment error");
+                likeCommentPending = false;
+              }
+            };
+          }}
+          class="inline-block"
         >
-          {#if likeComment.isPending}
-            <Loader2Icon class="animate-spin" />
-          {:else}
-            <HeartIcon
-              class={cn(
-                comment.likes.some(
-                  (like) => like.userId === $session?.data?.user?.id
-                ) && "fill-red-500 text-red-500"
-              )}
-            />
-          {/if}
-          <span>{comment.likes.length}</span>
-        </Button>
+          <Button
+            type="submit"
+            variant="ghost"
+            size="sm"
+            class="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
+            disabled={likeCommentPending}
+          >
+            {#if likeCommentPending}
+              <Loader2Icon class="animate-spin" />
+            {:else}
+              <HeartIcon
+                class={cn(
+                  comment.likes.some(
+                    (like) => like.userId === $session?.data?.user?.id
+                  ) && "fill-red-500 text-red-500"
+                )}
+              />
+            {/if}
+            <span>{comment.likes.length}</span>
+          </Button>
+        </form>
 
         <!-- Mention button -->
         <Button
@@ -112,9 +155,62 @@
               </Button>
             </DropdownMenu.Trigger>
             <DropdownMenu.Content align="end">
-              <DropdownMenu.Item class="text-destructive"
-                >Delete</DropdownMenu.Item
+              <form
+                method="POST"
+                action="?/deleteComment"
+                use:enhance={({ formData, cancel }) => {
+                  isPending = true;
+
+                  if (!comment.id) {
+                    cancel();
+                    return;
+                  }
+
+                  formData.append("commentId", comment.id);
+
+                  return async ({ result, update }) => {
+                    if (result?.status === 200) {
+                      isPending = false;
+
+                      // Invalidate root comments for the post
+                      await client.invalidateQueries({
+                        queryKey: ["root-comments", comment.postId],
+                      });
+
+                      // Invalidate parent comment's replies if this is a reply
+                      if (commentParentId) {
+                        await client.invalidateQueries({
+                          queryKey: ["comment-replies", commentParentId],
+                        });
+                      }
+
+                      // Invalidate posts query to update comment counts
+                      await client.invalidateQueries({
+                        queryKey: ["posts"],
+                      });
+
+                      await update();
+                    } else {
+                      console.log(result, "deleteComment error");
+                      isPending = false;
+                    }
+                  };
+                }}
               >
+                <DropdownMenu.Item>
+                  <button
+                    type="submit"
+                    class="w-full text-left text-destructive cursor-pointer"
+                    disabled={isPending}
+                  >
+                    {#if isPending}
+                      Delete...
+                    {:else}
+                      Delete
+                    {/if}
+                  </button>
+                </DropdownMenu.Item>
+              </form>
             </DropdownMenu.Content>
           </DropdownMenu.Root>
         {/if}
