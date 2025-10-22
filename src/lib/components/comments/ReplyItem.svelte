@@ -36,22 +36,26 @@
 <div class="group relative">
   <div class="flex gap-3">
     <!-- Avatar -->
-    <Avatar.Root class="h-8 w-8 shrink-0">
-      <Avatar.Image src={comment.author.image} alt={comment.author.name} />
-      <Avatar.Fallback class="text-xs">
-        {comment.author.name
-          .split(" ")
-          .map((n) => n[0])
-          .join("")
-          .toUpperCase()}
-      </Avatar.Fallback>
-    </Avatar.Root>
+    <a href={`/users/${comment.authorId}`} class="shrink-0">
+      <Avatar.Root class="h-8 w-8">
+        <Avatar.Image src={comment.author.image} alt={comment.author.name} />
+        <Avatar.Fallback class="text-xs">
+          {comment.author.name
+            .split(" ")
+            .map((n) => n[0])
+            .join("")
+            .toUpperCase()}
+        </Avatar.Fallback>
+      </Avatar.Root>
+    </a>
 
     <!-- Content -->
     <div class="min-w-0 flex-1">
       <!-- Header -->
       <div class="flex items-center gap-2 text-sm">
-        <span class="font-medium text-foreground">{comment.author.name}</span>
+        <a href={`/users/${comment.authorId}`} class="hover:underline">
+          <span class="font-medium text-foreground">{comment.author.name}</span>
+        </a>
         <span class="text-muted-foreground">
           {formatDistanceToNow(new Date(comment.createdAt), {
             addSuffix: true,

@@ -92,7 +92,7 @@
 
     <div class="flex-1 min-w-0">
       <div class="flex items-center gap-3 text-sm">
-        <a href={`/users/${comment.author.id}`}>
+        <a href={`/users/${comment.authorId}`} class="hover:underline">
           <p class="text-sm font-medium">{comment.author.name}</p>
         </a>
         <span class="text-xs text-muted-foreground">

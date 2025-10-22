@@ -28,7 +28,7 @@
   <form>
     <FieldGroup>
       <div class="flex flex-col items-center gap-2 text-center">
-        <a href="##" class="flex flex-col items-center gap-2 font-medium">
+        <a href="/" class="flex flex-col items-center gap-2 font-medium">
           <div class="flex size-8 items-center justify-center rounded-md">
             <svg
               class="size-6"

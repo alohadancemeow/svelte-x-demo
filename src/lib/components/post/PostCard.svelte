@@ -38,8 +38,6 @@
   // Handle like functionality
   let isLikeSubmitting = $state(false);
 
-  // $inspect(likeMutation.data, "likeMutation");
-
   const privacyMap = {
     public: Globe2Icon,
     followers: Users2Icon,
@@ -138,22 +136,6 @@
             )}
             onclick={() => (isImageExpanded = !isImageExpanded)}
           >
-            <img
-              src={post.image}
-              alt={post.author.name
-                ? `Post by ${post.author.name}`
-                : "Post content"}
-              class={cn(
-                "w-full h-auto object-cover cursor-pointer transition-transform",
-                isImageExpanded ? "hover:scale-[0.99]" : "hover:scale-[1.01]"
-              )}
-            />
-            {#if !isImageExpanded}
-              <div
-                class="absolute inset-0 bg-gradient-to-t from-background/20 to-transparent"
-              ></div>
-            {/if}
-
             <img
               src={post.image}
               alt={post.author.name

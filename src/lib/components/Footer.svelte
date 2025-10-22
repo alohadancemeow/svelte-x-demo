@@ -11,7 +11,7 @@
   const handleLogout = async () => {
     try {
       await authClient.signOut();
-      toast.success("Successfully logged out");
+      // toast.success("Successfully logged out");
     } catch (error) {
       console.error("Logout error:", error);
       toast.error("Failed to logout. Please try again.");
@@ -24,7 +24,7 @@
 </script>
 
 <footer
-  class="mt-auto border-t border-border/40 bg-gradient-to-r from-background via-muted/20 to-background backdrop-blur-sm"
+  class=" max-w-3xl mx-auto mt-8 border-t border-border/40 bg-gradient-to-r from-background via-muted/20 to-background backdrop-blur-sm"
 >
   <div class="container mx-auto px-4 py-6">
     <div class="flex items-center justify-between">
