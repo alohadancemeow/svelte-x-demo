@@ -159,13 +159,35 @@ export const commentLike = sqliteTable("comment_like", {
 	...timestampDefaults,
 });
 
+/**
+ * Follower table - User following relationships
+ * Tracks which users follow which users (many-to-many relationship)
+ * followerId follows followingId (like X.com/Twitter)
+ */
+export const follower = sqliteTable("follower", {
+	id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+	followerId: text("follower_id")
+		.notNull()
+		.references(() => user.id, { onDelete: "cascade" }), // User who is following
+	followingId: text("following_id")
+		.notNull()
+		.references(() => user.id, { onDelete: "cascade" }), // User being followed
+	...timestampDefaults,
+}, (table) => ({
+	// Database indexes for efficient querying
+	followerIdIdx: index("follower_follower_id_idx").on(table.followerId), // Find who a user follows
+	followingIdIdx: index("follower_following_id_idx").on(table.followingId), // Find who follows a user
+	// Unique constraint to prevent duplicate follows
+	uniqueFollow: index("follower_unique_follow_idx").on(table.followerId, table.followingId),
+}));
+
 // ============================================================================
 // DRIZZLE RELATIONS - Define table relationships for type-safe queries
 // ============================================================================
 
 /**
  * User Relations - All entities connected to a user
- * Enables queries like: user.posts, user.comments, user.likes
+ * Enables queries like: user.posts, user.comments, user.likes, user.followers, user.following
  */
 export const userRelations = relations(user, ({ many }) => ({
 	posts: many(post), // User's posts
@@ -174,6 +196,9 @@ export const userRelations = relations(user, ({ many }) => ({
 	commentLikes: many(commentLike), // User's comment likes
 	sessions: many(session), // User's active sessions
 	accounts: many(account), // User's OAuth accounts
+	// Follower relationships
+	followers: many(follower, { relationName: "following" }), // Users who follow this user
+	following: many(follower, { relationName: "follower" }), // Users this user follows
 }));
 
 /**
@@ -263,5 +288,22 @@ export const accountRelations = relations(account, ({ one }) => ({
 	user: one(user, {
 		fields: [account.userId],
 		references: [user.id],
+	}),
+}));
+
+/**
+ * Follower Relations - User following relationships
+ * Links followers to both the follower and the user being followed
+ */
+export const followerRelations = relations(follower, ({ one }) => ({
+	follower: one(user, {
+		fields: [follower.followerId],
+		references: [user.id],
+		relationName: "follower",
+	}),
+	following: one(user, {
+		fields: [follower.followingId],
+		references: [user.id],
+		relationName: "following",
 	}),
 }));
