@@ -3,7 +3,8 @@
   import favicon from "$lib/assets/favicon.svg";
   import { QueryClientProvider } from "@tanstack/svelte-query";
   import type { LayoutProps } from "./$types";
-   import { Toaster } from "$lib/components/ui/sonner/index.js";
+  import { Toaster } from "$lib/components/ui/sonner/index.js";
+  import Footer from "$lib/components/Footer.svelte";
 
   let { data, children }: LayoutProps = $props();
 </script>
@@ -17,6 +18,7 @@
     <main class="mx-auto antialiased">
       {@render children()}
     </main>
+    <Footer />
     <Toaster />
   </QueryClientProvider>
 </div>

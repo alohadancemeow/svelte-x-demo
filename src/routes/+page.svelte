@@ -43,7 +43,6 @@
       {#if $session.data}
         <div class="p-4">
           <PostForm />
-          <!-- <button onclick={() => authClient.signOut()}>Sign Out</button> -->
         </div>
       {:else}
         <div class="p-4 text-center">

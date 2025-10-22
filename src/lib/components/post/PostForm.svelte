@@ -3,10 +3,7 @@
     Globe2Icon,
     ImagePlusIcon,
     Loader2Icon,
-    LockIcon,
-    SendIcon,
     SmilePlusIcon,
-    Users2Icon,
     XIcon,
     Sparkles,
   } from "@lucide/svelte";
@@ -16,68 +13,27 @@
   import { Separator } from "$lib/components/ui/separator/index.js";
   import * as Select from "$lib/components/ui/select/index.js";
   import { toast } from "svelte-sonner";
-  // import { useCreatePost } from "@/hooks/use-posts";
-  import PostEditor from "$lib/components/post/PostEditor.svelte";
   import { authClient } from "$lib/auth-client";
-  // import Editor from "../editor/editor.svelte";
-
-  const privacyOptions = [
-    {
-      value: "public",
-      label: "Public",
-      description: "Anyone can see your post",
-      icon: Globe2Icon,
-    },
-    {
-      value: "followers",
-      label: "Followers",
-      description: "Only your followers can see your post",
-      icon: Users2Icon,
-    },
-    {
-      value: "private",
-      label: "Private",
-      description: "Only you can see your post",
-      icon: LockIcon,
-    },
-  ] as const;
-
-  const feelingOptions = [
-    "Happy",
-    "Sad",
-    "Angry",
-    "Surprised",
-    "Love",
-    "Excited",
-    "Stressed",
-    "Relaxed",
-    "Bored",
-    "Busy",
-    "Hungry",
-    "Thirsty",
-    "Sleepy",
-    "Sick",
-    "Dizzy",
-    "Stoned",
-    "Drunk",
-    "High",
-    "Stoned",
-  ] as const;
-
-  type Privacy = (typeof privacyOptions)[number]["value"];
-  type Feeling = (typeof feelingOptions)[number];
+  import { Textarea } from "$lib/components/ui/textarea/index.js";
+  import { enhance } from "$app/forms";
+  import {
+    privacyOptions,
+    feelingOptions,
+    type Privacy,
+    type Feeling,
+  } from "$lib/components/post/data.js";
+  import { useQueryClient } from "@tanstack/svelte-query";
 
   let fileInputRef: HTMLInputElement | null = $state(null);
-  const createPost = { isPending: false };
-
+  let isSubmitting = $state(false);
   let privacy: Privacy = $state("public");
   let feeling: Feeling | null = $state(null);
   let previewUrl: string | null = $state(null);
   let selectedImage: File | null = $state(null);
-  let content: string = $state(""); // include html tags
-  let text: string = $state(""); // plain text
+  let text: string = $state(""); // plain text content
 
   let session = authClient.useSession();
+  const client = useQueryClient();
 
   const handleImageSelect = (event: any) => {
     const file = event.target.files?.[0];
@@ -113,28 +69,49 @@
 
   const PrivacyIcon = $derived(selectedPrivacy?.icon || Globe2Icon);
 
-  const handleSubmit = async (e: any) => {
-    // e.preventDefault();
-    // if (!content.trim()) return;
-    // try {
-    //   const formData = new FormData();
-    //   formData.append("content", content.trim());
-    //   formData.append("privacy", privacy);
-    //   if (feeling) formData.append("feeling", feeling);
-    //   if (selectedImage) formData.append("image", selectedImage);
-    //   await createPost.mutateAsync(formData);
-    //   setContent("");
-    //   setFeeling(null);
-    //   removeImage();
-    // } catch (error) {
-    //   console.error(error);
-    // }
+  const resetForm = () => {
+    text = "";
+    feeling = null;
+    removeImage();
   };
-
-  // $inspect(content, "content");
 </script>
 
-<form class="rounded-xl border bg-card transition-shadow">
+<form
+  method="POST"
+  action="?/createPost"
+  enctype="multipart/form-data"
+  class="rounded-xl border bg-card transition-shadow"
+  use:enhance={({ formData }) => {
+    // Add the image file to form data if selected
+    if (selectedImage && selectedImage.size > 0) {
+      formData.append("image", selectedImage);
+    } else {
+      console.log("No image selected or image size is 0", {
+        selectedImage,
+        size: selectedImage?.size,
+      });
+    }
+
+    isSubmitting = true;
+
+    return async ({ result, update }) => {
+      isSubmitting = false;
+
+      if (result.type === "success") {
+        console.log(result.data, "new post data");
+
+        await client.invalidateQueries({ queryKey: ["posts"] });
+        toast.success("Post created successfully!");
+        resetForm();
+      } else if (result.type === "failure") {
+        console.log(result.data?.error);
+        toast.error("Failed to create post");
+      }
+
+      await update();
+    };
+  }}
+>
   <div class="p-4 space-y-4">
     <div class="flex gap-3">
       <Avatar.Root>
@@ -145,23 +122,24 @@
         <Avatar.Fallback
           >{$session?.data?.user?.name?.charAt(0)}
         </Avatar.Fallback>
-        <!-- <Avatar.Image
-                    src="https://github.com/shadcn.png"
-                    alt="@shadcn"
-                />
-                <Avatar.Fallback>CN</Avatar.Fallback> -->
       </Avatar.Root>
 
       <!-- Post Editor -->
       <div class="flex-1 space-y-4">
         <div>
-          <PostEditor
-            bind:content
-            bind:text
+          <Textarea
+            name="content"
             placeholder="What's on your mind?"
-            minHeight="120px"
+            bind:value={text}
+            class="w-full min-h-[120px] text-xl leading-relaxed font-normal tracking-wide resize-none border-none bg-transparent px-2 outline-none transition-all duration-300 focus:bg-muted/20 focus:px-4 focus:py-6 focus:rounded-xl hover:rounded-lg placeholder:text-muted-foreground/60 placeholder:font-light placeholder:text-xl placeholder:tracking-wide selection:bg-primary/20"
           />
         </div>
+
+        <!-- Hidden inputs for form data -->
+        <input type="hidden" name="privacy" value={privacy} />
+        {#if feeling}
+          <input type="hidden" name="feeling" value={feeling} />
+        {/if}
 
         {#if feeling !== null}
           <div class="flex items-center gap-2 text-sm text-muted-foreground">
@@ -299,8 +277,13 @@
         <div class="text-sm text-muted-foreground">
           {text.length}/ 500 characters
         </div>
-        <Button type="submit" size={"sm"} class="h-9 px-6">
-          {#if createPost.isPending}
+        <Button
+          disabled={(!text && !selectedImage) || isSubmitting}
+          type="submit"
+          size={"sm"}
+          class="h-9 px-6"
+        >
+          {#if isSubmitting}
             <Loader2Icon class="size-4 animate-spin" />
           {:else}
             Post

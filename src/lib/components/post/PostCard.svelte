@@ -20,6 +20,7 @@
   import { authClient } from "$lib/auth-client";
   import { createMutation, useQueryClient } from "@tanstack/svelte-query";
   import { goto } from "$app/navigation";
+  import { enhance } from "$app/forms";
 
   type PostCardProps = {
     post: PostWithInfo;
@@ -31,6 +32,7 @@
 
   let showComments = $state(false);
   let isImageExpanded = $state(false);
+  let showDeleteConfirm = $state(false);
   const isAuthor = $derived($session?.data?.user.id === post.authorId);
 
   const endpoint = `/api/posts/${post.id}/like`;
@@ -203,8 +205,13 @@
               </Button>
             </DropdownMenu.Trigger>
             <DropdownMenu.Content align="end">
-              <DropdownMenu.Item>Edit</DropdownMenu.Item>
-              <DropdownMenu.Item>Delete</DropdownMenu.Item>
+              <DropdownMenu.Item
+                onclick={() => {
+                  showDeleteConfirm = true;
+                }}
+              >
+                Delete
+              </DropdownMenu.Item>
             </DropdownMenu.Content>
           </DropdownMenu.Root>
         {/if}
@@ -315,3 +322,45 @@
     </div>
   </div>
 </div>
+
+<!-- Delete Confirmation Dialog -->
+{#if showDeleteConfirm}
+  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+      <h3 class="text-lg font-semibold mb-2">Delete Post</h3>
+      <p class="text-gray-600 mb-4">
+        Are you sure you want to delete this post? This action cannot be undone.
+      </p>
+
+      <div class="flex gap-3 justify-end">
+        <Button variant="outline" onclick={() => (showDeleteConfirm = false)}>
+          Cancel
+        </Button>
+
+        <form
+          method="POST"
+          action="?/deletePost"
+          use:enhance={() => {
+            return async ({ result, update }) => {
+              if (result.type === "success") {
+                toast.success("Post deleted successfully");
+                showDeleteConfirm = false;
+                // Invalidate posts query to refresh the list
+                await client.invalidateQueries({ queryKey: ["posts"] });
+              } else if (result.type === "failure") {
+                console.error(result.data?.error);
+                toast.error("Failed to delete post");
+              }
+
+              await update();
+            };
+          }}
+          class="inline"
+        >
+          <input type="hidden" name="postId" value={post.id} />
+          <Button type="submit" variant="destructive">Delete</Button>
+        </form>
+      </div>
+    </div>
+  </div>
+{/if}
