@@ -18,7 +18,7 @@
   import CommentList from "$lib/components/comments/CommentList.svelte";
   import type { PostWithInfo } from "$lib/zod-schemas";
   import { authClient } from "$lib/auth-client";
-  import { createMutation, useQueryClient } from "@tanstack/svelte-query";
+  import { useQueryClient } from "@tanstack/svelte-query";
   import { goto } from "$app/navigation";
   import { enhance } from "$app/forms";
 
@@ -35,103 +35,8 @@
   let showDeleteConfirm = $state(false);
   const isAuthor = $derived($session?.data?.user.id === post.authorId);
 
-  const endpoint = `/api/posts/${post.id}/like`;
-
-  const likeMutation = createMutation(() => ({
-    mutationFn: async () => {
-      const response = await fetch(endpoint, { method: "POST" });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        const error = new Error(
-          errorData.error || `HTTP error! status: ${response.status}`
-        );
-        // Add status code to error for specific handling
-        (error as any).status = response.status;
-        throw error;
-      }
-
-      const data = await response.json();
-      return data;
-    },
-    onMutate: async (variables: { postId: string }) => {
-      // Cancel any outgoing refetches (so they don't overwrite our optimistic update)
-      await client.cancelQueries({ queryKey: ["posts"] });
-
-      // Snapshot the previous value
-      const previousPosts = client.getQueryData(["posts"]);
-
-      // Optimistically update to the new value
-      if (previousPosts && $session.data?.user?.id) {
-        const currentUserId = $session.data.user.id;
-
-        if (Array.isArray(previousPosts)) {
-          const updatedPosts = previousPosts.map((p: any) => {
-            if (p.id === variables.postId) {
-              // Check if user already liked this post
-              const userHasLiked = p.likes?.some(
-                (like: any) => like.userId === currentUserId
-              );
-
-              if (userHasLiked) {
-                // Remove the like optimistically
-                return {
-                  ...p,
-                  likes: p.likes.filter(
-                    (like: any) => like.userId !== currentUserId
-                  ),
-                };
-              } else {
-                // Add the like optimistically
-                const newLike = {
-                  id: crypto.randomUUID(), // Temporary ID
-                  postId: variables.postId,
-                  userId: currentUserId,
-                  createdAt: new Date(),
-                  updatedAt: new Date(),
-                };
-                return {
-                  ...p,
-                  likes: [...(p.likes || []), newLike],
-                };
-              }
-            }
-            return p;
-          });
-
-          client.setQueryData(["posts"], updatedPosts);
-        }
-      }
-
-      // Return a context object with the snapshotted value
-      return { previousPosts };
-    },
-    onError: (error, variables, context) => {
-      // Rollback to previous state on error
-      if (context?.previousPosts) {
-        client.setQueryData(["posts"], context.previousPosts);
-      }
-      console.error(error);
-
-      // Check if it's a 401 Unauthorized error
-      if ((error as any).status === 401) {
-        toast.error("Please sign in to interact with posts", {
-          action: {
-            label: "Sign In",
-            onClick: () => {
-              goto("/auth/sign-in");
-            },
-          },
-        });
-      } else {
-        toast.error("Failed to like post");
-      }
-    },
-    onSettled: async () => {
-      // Only invalidate once, after everything is settled
-      await client.invalidateQueries({ queryKey: ["posts"] });
-    },
-  }));
+  // Handle like functionality
+  let isLikeSubmitting = $state(false);
 
   // $inspect(likeMutation.data, "likeMutation");
 
@@ -270,33 +175,69 @@
 
       <!-- Post Actions -->
       <div class="flex items-center gap-2 mt-4">
-        <button
-          onclick={() => {
-            likeMutation.mutate({ postId: post.id });
+        <form
+          method="POST"
+          action="?/likePost"
+          use:enhance={() => {
+            isLikeSubmitting = true;
+
+            return async ({ result, update }) => {
+              if (result?.status === 200) {
+                isLikeSubmitting = false;
+
+                // Invalidate posts query to refresh the data
+                await client.invalidateQueries({ queryKey: ["posts"] });
+
+                await update();
+              } else {
+                isLikeSubmitting = false;
+                console.log(result, "likePost error");
+
+                // Handle different error status codes
+                if (result?.status === 401) {
+                  toast.error("Please sign in to interact with posts", {
+                    action: {
+                      label: "Sign In",
+                      onClick: () => {
+                        goto("/auth/sign-in");
+                      },
+                    },
+                  });
+                } else {
+                  toast.error("Failed to like post");
+                }
+              }
+            };
           }}
-          disabled={likeMutation.isPending}
-          class="group cursor-pointer flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-accent hover:bg-accent/80 transition-all duration-200 hover:px-4"
+          class="inline"
         >
-          <HeartIcon
-            class={cn(
-              "size-4 flex-shrink-0",
-              likeMutation.isPending && "animate-pulse",
-              post.likes?.some(
-                (like: any) => like.userId === $session.data?.user?.id
-              ) && "fill-current text-red-500"
-            )}
-          />
-          <span class="text-sm font-medium">{post?.likes?.length || 0}</span>
-          <span
-            class="text-sm font-medium max-w-0 overflow-hidden group-hover:max-w-[4rem] transition-all duration-200 whitespace-nowrap"
+          <input type="hidden" name="postId" value={post.id} />
+          <button
+            type="submit"
+            disabled={isLikeSubmitting}
+            class="group cursor-pointer flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-accent hover:bg-accent/80 transition-all duration-200 hover:px-4"
           >
-            {post?.likes?.some(
-              (like: any) => like.userId === $session.data?.user?.id
-            )
-              ? "Liked"
-              : "Like"}
-          </span>
-        </button>
+            <HeartIcon
+              class={cn(
+                "size-4 flex-shrink-0",
+                isLikeSubmitting && "animate-pulse",
+                post.likes?.some(
+                  (like: any) => like.userId === $session.data?.user?.id
+                ) && "fill-current text-red-500"
+              )}
+            />
+            <span class="text-sm font-medium">{post?.likes?.length || 0}</span>
+            <span
+              class="text-sm font-medium max-w-0 overflow-hidden group-hover:max-w-[4rem] transition-all duration-200 whitespace-nowrap"
+            >
+              {post?.likes?.some(
+                (like: any) => like.userId === $session.data?.user?.id
+              )
+                ? "Liked"
+                : "Like"}
+            </span>
+          </button>
+        </form>
         <button
           onclick={() => (showComments = !showComments)}
           class="group cursor-pointer flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-accent hover:bg-accent/80 transition-all duration-200 hover:px-4"

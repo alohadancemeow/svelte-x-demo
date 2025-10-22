@@ -1,7 +1,7 @@
 import { db } from '$lib/server/db';
-import { comment, post } from '$lib/server/db/schema';
+import { comment, post, like } from '$lib/server/db/schema';
 import { fail, type Actions } from '@sveltejs/kit';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import z from 'zod';
 import type { PageServerLoad } from './$types';
 import { getCommentsForPost, createComment, createReply, deleteComment, toggleCommentLike } from '$lib/server/db/comments';
@@ -345,6 +345,54 @@ export const actions = {
         } catch (error) {
             console.error('Error deleting post:', error);
             return fail(500, { error: 'Failed to delete post. Please try again.' });
+        }
+    },
+
+    likePost: async ({ request, locals }) => {
+        if (!locals.session?.userId) {
+            return fail(401, { error: 'You must be logged in to like posts.' });
+        }
+
+        try {
+            const formData = await request.formData();
+            const postId = formData.get('postId') as string;
+
+            if (!postId) {
+                return fail(400, { error: 'Post ID is required.' });
+            }
+
+            // Check if user already liked this post
+            const existingLike = await db.query.like.findFirst({
+                where: and(
+                    eq(like.postId, postId),
+                    eq(like.userId, locals.session.userId)
+                )
+            });
+
+            if (existingLike) {
+                // Unlike the post
+                await db.delete(like).where(
+                    and(
+                        eq(like.postId, postId),
+                        eq(like.userId, locals.session.userId)
+                    )
+                );
+            } else {
+                // Like the post
+                await db.insert(like).values({
+                    id: crypto.randomUUID(),
+                    postId,
+                    userId: locals.session.userId,
+                    createdAt: new Date(),
+                    updatedAt: new Date(),
+                });
+            }
+
+            return { success: true, postId, liked: !existingLike };
+
+        } catch (error) {
+            console.error('Error toggling like:', error);
+            return fail(500, { error: 'Failed to toggle like. Please try again.' });
         }
     },
 } satisfies Actions;
