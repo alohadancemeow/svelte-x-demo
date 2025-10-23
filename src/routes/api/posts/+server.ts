@@ -15,7 +15,7 @@ export const GET: RequestHandler = async ({ locals, url }) => {
         const limit = parseInt(url.searchParams.get('limit') || '5');
         const offset = (page - 1) * limit;
 
-        console.log(`Fetching ${feedType} feed - Page: ${page}, Limit: ${limit}, Offset: ${offset}`);
+        // console.log(`Fetching ${feedType} feed - Page: ${page}, Limit: ${limit}, Offset: ${offset}`);
 
         let posts: Awaited<ReturnType<typeof db.query.post.findMany>>;
         let totalCount = 0;
@@ -32,19 +32,11 @@ export const GET: RequestHandler = async ({ locals, url }) => {
             const followingUserIds = followingUsers.map(f => f.followingId);
 
             if (followingUserIds.length > 0) {
-                // Get total count for pagination
-                const countResult = await db
-                    .select({ count: post.id })
-                    .from(post)
-                    .where(inArray(post.authorId, followingUserIds));
-                totalCount = countResult.length;
-
-                // Get posts only from users they follow with pagination
-                posts = await db.query.post.findMany({
+                // Get posts from followed users with privacy filtering
+                // Include: public posts, followers-only posts from followed users, and user's own private posts
+                const allFollowingPosts = await db.query.post.findMany({
                     where: inArray(post.authorId, followingUserIds),
                     orderBy: (post, { desc }) => [desc(post.createdAt)],
-                    limit: limit,
-                    offset: offset,
                     with: {
                         author: true,
                         comments: {
@@ -56,33 +48,97 @@ export const GET: RequestHandler = async ({ locals, url }) => {
                         likes: true,
                     },
                 });
+
+                // Filter posts based on privacy settings (return true: means "include this specific post")
+                /**
+                 * For example:
+                 * - Post 1: authorId === session.userId → return true → included
+                 * - Post 2: authorId !== session.userId → continues to next condition
+                 * - Post 3: authorId === session.userId → return true → included
+                 * So return true only includes that specific post where the condition is met.
+                 */
+                const filteredPosts = allFollowingPosts.filter(p => {
+                    // Always show user's own posts (including private)
+                    if (p.authorId === session.userId) return true;
+
+                    // Show public posts from followed users
+                    if (p.privacy === 'public') return true;
+
+                    // Show followers-only posts from followed users (since user follows them)
+                    if (p.privacy === 'followers') return true;
+
+                    // Hide private posts from other users
+                    return false;
+                });
+
+                // Apply pagination to filtered results
+                totalCount = filteredPosts.length;
+                posts = filteredPosts.slice(offset, offset + limit);
             } else {
                 // User doesn't follow anyone, return empty array
                 posts = [];
                 totalCount = 0;
             }
         } else {
-            // All feed: get all posts (default behavior for unauthenticated users or when feedType is 'all')
+            // All feed: get all posts with privacy filtering
 
-            // Get total count for pagination
-            const countResult = await db.select({ count: post.id }).from(post);
-            totalCount = countResult.length;
-
-            posts = await db.query.post.findMany({
-                orderBy: (post, { desc }) => [desc(post.createdAt)],
-                limit: limit,
-                offset: offset,
-                with: {
-                    author: true,
-                    comments: {
-                        with: {
-                            author: true,
-                            likes: true,
+            if (session?.userId) {
+                // For authenticated users: show all posts except private posts (unless they're the author)
+                const allPosts = await db.query.post.findMany({
+                    orderBy: (post, { desc }) => [desc(post.createdAt)],
+                    with: {
+                        author: true,
+                        comments: {
+                            with: {
+                                author: true,
+                                likes: true,
+                            },
                         },
+                        likes: true,
                     },
-                    likes: true,
-                },
-            });
+                });
+
+                // Filter posts based on privacy settings for "all" feed
+                const filteredPosts = allPosts.filter(p => {
+                    // Always show user's own posts (including private)
+                    if (p.authorId === session.userId) return true;
+
+                    // Show public posts from all users
+                    if (p.privacy === 'public') return true;
+
+                    // Show followers-only posts from all users (not restricted by following relationship in "all" feed)
+                    if (p.privacy === 'followers') return true;
+
+                    // Hide private posts from other users
+                    return false;
+                });
+
+                // Apply pagination to filtered results
+                totalCount = filteredPosts.length;
+                posts = filteredPosts.slice(offset, offset + limit);
+            } else {
+                // For unauthenticated users: show public and followers-only posts
+                const allPosts = await db.query.post.findMany({
+                    orderBy: (post, { desc }) => [desc(post.createdAt)],
+                    with: {
+                        author: true,
+                        comments: {
+                            with: {
+                                author: true,
+                                likes: true,
+                            },
+                        },
+                        likes: true,
+                    },
+                });
+
+                // Filter to show public and followers-only posts (but not private)
+                const filteredPosts = allPosts.filter(p => p.privacy === 'public' || p.privacy === 'followers');
+
+                // Apply pagination to filtered results
+                totalCount = filteredPosts.length;
+                posts = filteredPosts.slice(offset, offset + limit);
+            }
         }
 
         const { success, data: parsedPosts, error } = postsWithInfoSchema.safeParse(posts);

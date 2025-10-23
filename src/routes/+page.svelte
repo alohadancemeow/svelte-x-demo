@@ -211,8 +211,62 @@
           {/if}
         </div>
       {:else if posts && posts.length === 0}
-        <div class="p-4 text-center">
-          <div class="text-muted-foreground">No posts found</div>
+        <div class="p-8 text-center max-w-md mx-auto">
+          <div class="mb-4">
+            <svg
+              class="w-16 h-16 mx-auto text-muted-foreground/50"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="1.5"
+                d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+              />
+            </svg>
+          </div>
+          <h3 class="text-lg font-semibold mb-2">No posts yet!</h3>
+          <p class="text-muted-foreground mb-4">
+            {#if feedType === "following"}
+              Your following feed is empty. Try following some users to see
+              their posts here!
+            {:else}
+              No posts have been shared yet. Be the first to post something
+              interesting!
+            {/if}
+          </p>
+          <div class="space-y-2">
+            {#if feedType === "following"}
+              <button
+                onclick={() => updateFeedType("all")}
+                class="inline-flex cursor-pointer items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
+              >
+                <svg
+                  class="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M12 4v16m8-8H4"
+                  />
+                </svg>
+                Find People to Follow
+              </button>
+            {:else}
+              <button
+                onclick={() => updateFeedType("following")}
+                class="text-primary hover:text-primary/80 transition-colors"
+              >
+                Check your following feed instead
+              </button>
+            {/if}
+          </div>
         </div>
       {:else if posts}
         <div>
