@@ -6,19 +6,22 @@
   import { cn } from "$lib/utils";
   import { authClient } from "$lib/auth-client";
   import type { PageProps } from "./$types";
-  import { createQuery } from "@tanstack/svelte-query";
-  import type { PostsWithInfo } from "$lib/zod-schemas";
+  import { createInfiniteQuery } from "@tanstack/svelte-query";
   import { page } from "$app/state";
   import { goto } from "$app/navigation";
-
-  // let { data }: PageProps = $props();
-  const session = authClient.useSession();
+  import { ArrowUpFromDot } from "@lucide/svelte";
+  import Button from "$lib/components/ui/button/button.svelte";
 
   type FeedType = "following" | "all";
 
+  let { data }: PageProps = $props();
+  const session = authClient.useSession();
+
   // Get feedType from URL parameters, default to "all"
   const feedType = $derived(
-    (page.url.searchParams.get("feedType") as FeedType) || "all"
+    (page.url.searchParams.get("feedType") as FeedType) ||
+      data.feedType ||
+      "all"
   );
 
   // Function to update URL with new feedType
@@ -41,29 +44,91 @@
 
   const endpoint = "/api/posts";
 
-  const fetchPosts = async (
-    currentFeedType: FeedType
-  ): Promise<PostsWithInfo> => {
-    const url = new URL(endpoint, window.location.origin);
-    url.searchParams.set("feedType", currentFeedType);
-    const response = await fetch(url.toString()).then((res) => res.json());
-    return response.posts; // Extract the posts array from the response
+  const fetchPosts = async (currentFeedType: FeedType, pageParam: number) => {
+    try {
+      const url = new URL(endpoint, window.location.origin);
+      url.searchParams.set("feedType", currentFeedType);
+      url.searchParams.set("page", pageParam.toString());
+
+      const response = await fetch(url.toString());
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error("Error fetching posts:", error);
+      // Return a proper structure even on error to prevent undefined access
+      return {
+        posts: [],
+        pagination: {
+          hasNextPage: false,
+          nextPage: null,
+          currentPage: pageParam,
+          totalPages: 0,
+        },
+      };
+    }
   };
 
-  const postsQuery = createQuery(() => ({
-    queryKey: ["posts", feedType], // Include feedType in query key for proper caching
-    queryFn: () => fetchPosts(feedType),
-    // refetchInterval: intervalMs,
-    refetchOnWindowFocus: true, // Refetch when user returns to tab
-    staleTime: 0, // Reduce stale time to ensure fresh data when switching
-    // initialData: feedType === "all" ? data?.posts || [] : [], // Only use server data for 'all' feed
-    enabled: true, // Ensure query is always enabled
+  const postsQuery = createInfiniteQuery(() => ({
+    queryKey: ["posts", feedType, "infinite"], // Dynamic key based on current feedType
+    queryFn: ({ pageParam }) => fetchPosts(feedType, pageParam),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) => {
+      if (!lastPage || !lastPage.pagination) {
+        return undefined;
+      }
+
+      return lastPage.pagination.hasNextPage
+        ? lastPage.pagination.nextPage
+        : undefined;
+    },
+    staleTime: 1000 * 60 * 5, // Consider data fresh for 5 minutes
+    gcTime: 1000 * 60 * 10, // Keep in cache for 10 minutes
   }));
 
-  // Extract reactive values
-  const posts = $derived(postsQuery.data);
+  // Extract posts from infinite query
+  const posts = $derived(
+    postsQuery.data?.pages?.flatMap((page) => page?.posts || []) || []
+  );
+
+  // $inspect(posts);
+
   const error = $derived(postsQuery.error);
   const isLoading = $derived(postsQuery.isLoading);
+  const isFetchingNextPage = $derived(postsQuery.isFetchingNextPage);
+  const hasNextPage = $derived(postsQuery.hasNextPage);
+  const fetchNextPage = postsQuery.fetchNextPage; // function to fetch next page
+
+  // Infinite scroll implementation
+  let loadMoreTrigger = $state<HTMLElement | null>(null);
+
+  $effect(() => {
+    if (!loadMoreTrigger || !hasNextPage || isFetchingNextPage) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const [entry] = entries;
+        if (entry.isIntersecting && hasNextPage && !isFetchingNextPage) {
+          fetchNextPage();
+        }
+      },
+      {
+        root: null,
+        rootMargin: "100px", // Start loading 100px before the element comes into view
+        threshold: 0.1,
+      }
+    );
+
+    observer.observe(loadMoreTrigger);
+
+    return () => {
+      observer.disconnect();
+    };
+  });
 </script>
 
 <div class="max-w-3xl mx-auto mt-6">
@@ -155,6 +220,37 @@
             <PostCard {post} />
           {/each}
         </div>
+
+        <!-- Infinite Scroll Trigger -->
+        {#if hasNextPage}
+          <div bind:this={loadMoreTrigger} class="p-4 text-center">
+            {#if isFetchingNextPage}
+              <div class="flex items-center justify-center">
+                <span class="text-muted-foreground">Loading more posts...</span>
+              </div>
+            {:else}
+              <div class="h-4"></div>
+              <!-- Invisible trigger area -->
+            {/if}
+          </div>
+        {:else if posts.length > 0}
+          <!-- Back to Top button when no more posts -->
+          <div class="p-6 text-center">
+            <div class="mb-2">
+              <span class="text-muted-foreground text-sm"
+                >You've reached the end!</span
+              >
+            </div>
+            <Button
+              variant="outline"
+              size="icon"
+              onclick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+              class="bg-background border-border hover:bg-muted p-2 rounded-full"
+            >
+              <ArrowUpFromDot class="w-4 h-4" />
+            </Button>
+          </div>
+        {/if}
       {/if}
     </div>
   </div>
