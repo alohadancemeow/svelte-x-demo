@@ -17,6 +17,8 @@
   import type { PageData } from "./$types";
   import { toast } from "svelte-sonner";
   import { goto } from "$app/navigation";
+  import { enhance } from "$app/forms";
+  import { invalidateAll } from "$app/navigation";
 
   let { data }: { data: PageData } = $props();
 
@@ -133,16 +135,35 @@
             >
               <MailIcon class="h-4 w-4" />
             </Button>
-            <Button
-              variant="outline"
-              class="bg-background border-border hover:bg-muted rounded-3xl"
-              onclick={() => {
-                toast.info("Follow feature coming soon!");
+
+            <!-- Follow/Unfollow Button -->
+            <form
+              method="POST"
+              use:enhance={({ formData }) => {
+                formData.set("userId", data.user.id);
+
+                return async ({ result, update }) => {
+                  if (result.type === "success") {
+                    await invalidateAll();
+                    await update();
+                  } else if (result.type === "failure") {
+                    console.log(result.data?.error);
+                    toast.error("Failed to follow user");
+                  }
+                };
               }}
             >
-              <UserPlusIcon class="h-4 w-4 mr-2" />
-              Follow
-            </Button>
+              <Button
+                type="submit"
+                variant="outline"
+                class="bg-background border-border rounded-3xl {data.isFollowing
+                  ? 'hover:bg-red-500 hover:text-white hover:border-red-500'
+                  : 'hover:bg-muted'}"
+              >
+                <UserPlusIcon class="h-4 w-4" />
+                {data.isFollowing ? "Unfollow" : "Follow"}
+              </Button>
+            </form>
           </div>
         {:else}
           <!-- For non-logged in users, show buttons that prompt to sign in -->
@@ -178,7 +199,7 @@
                 });
               }}
             >
-              <UserPlusIcon class="h-4 w-4 mr-2" />
+              <UserPlusIcon class="h-4 w-4" />
               Follow
             </Button>
           </div>

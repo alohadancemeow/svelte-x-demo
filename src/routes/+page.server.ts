@@ -1,5 +1,5 @@
 import { db } from '$lib/server/db';
-import { comment, post, like } from '$lib/server/db/schema';
+import { post, like } from '$lib/server/db/schema';
 import { fail, type Actions } from '@sveltejs/kit';
 import { eq, and } from 'drizzle-orm';
 import z from 'zod';

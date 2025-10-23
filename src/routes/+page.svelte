@@ -5,29 +5,59 @@
   import * as Tabs from "$lib/components/ui/tabs/index.js";
   import { cn } from "$lib/utils";
   import { authClient } from "$lib/auth-client";
-  import type { PageData, PageProps } from "./$types";
+  import type { PageProps } from "./$types";
   import { createQuery } from "@tanstack/svelte-query";
   import type { PostsWithInfo } from "$lib/zod-schemas";
+  import { page } from "$app/state";
+  import { goto } from "$app/navigation";
 
-  let { data, form }: PageProps = $props();
+  // let { data }: PageProps = $props();
   const session = authClient.useSession();
-  let feedType = $state("following");
-  // let intervalMs = $state(1000);
+
+  type FeedType = "following" | "all";
+
+  // Get feedType from URL parameters, default to "all"
+  const feedType = $derived(
+    (page.url.searchParams.get("feedType") as FeedType) || "all"
+  );
+
+  // Function to update URL with new feedType
+  const updateFeedType = (newFeedType: FeedType) => {
+    const url = new URL(page.url);
+    if (newFeedType === "all") {
+      url.searchParams.delete("feedType"); // Remove param for default "all"
+    } else {
+      url.searchParams.set("feedType", newFeedType);
+    }
+    goto(url.toString(), { replaceState: true, noScroll: true });
+  };
+
+  // Reset to 'all' if user logs out while on 'following' feed
+  $effect(() => {
+    if (!$session.data && feedType === "following") {
+      updateFeedType("all");
+    }
+  });
 
   const endpoint = "/api/posts";
 
-  const fetchPosts = async (): Promise<PostsWithInfo> => {
-    const response = await fetch(endpoint).then((res) => res.json());
+  const fetchPosts = async (
+    currentFeedType: FeedType
+  ): Promise<PostsWithInfo> => {
+    const url = new URL(endpoint, window.location.origin);
+    url.searchParams.set("feedType", currentFeedType);
+    const response = await fetch(url.toString()).then((res) => res.json());
     return response.posts; // Extract the posts array from the response
   };
 
   const postsQuery = createQuery(() => ({
-    queryKey: ["posts"],
-    queryFn: fetchPosts,
+    queryKey: ["posts", feedType], // Include feedType in query key for proper caching
+    queryFn: () => fetchPosts(feedType),
     // refetchInterval: intervalMs,
     refetchOnWindowFocus: true, // Refetch when user returns to tab
-    staleTime: 30000, // Consider data fresh for 30 seconds
-    initialData: data?.posts || [], // Server load data is already in the correct format
+    staleTime: 0, // Reduce stale time to ensure fresh data when switching
+    // initialData: feedType === "all" ? data?.posts || [] : [], // Only use server data for 'all' feed
+    enabled: true, // Ensure query is always enabled
   }));
 
   // Extract reactive values
@@ -59,30 +89,39 @@
       {/if}
 
       <!-- Feed Tabs -->
-      <div class="px-4 py-3">
-        <Tabs.Root bind:value={feedType} class="w-full">
-          <Tabs.List class="grid w-full grid-cols-2 h-11">
-            <Tabs.Trigger
-              class={cn(
-                "font-semibold text-base cursor-pointer",
-                feedType === "following" && "bg-muted"
-              )}
-              value="following"
-            >
-              Following
-            </Tabs.Trigger>
-            <Tabs.Trigger
-              class={cn(
-                "font-semibold text-base cursor-pointer",
-                feedType === "all" && "bg-muted"
-              )}
-              value="all"
-            >
-              All
-            </Tabs.Trigger>
-          </Tabs.List>
-        </Tabs.Root>
-      </div>
+      {#if $session.data}
+        <div class="px-4 py-3">
+          <Tabs.Root value={feedType} class="w-full">
+            <Tabs.List class="grid w-full grid-cols-2 h-11">
+              <Tabs.Trigger
+                class={cn(
+                  "font-semibold text-base cursor-pointer",
+                  feedType === "following" && "bg-muted"
+                )}
+                value="following"
+                onclick={() => updateFeedType("following")}
+              >
+                Following
+              </Tabs.Trigger>
+              <Tabs.Trigger
+                class={cn(
+                  "font-semibold text-base cursor-pointer",
+                  feedType === "all" && "bg-muted"
+                )}
+                value="all"
+                onclick={() => updateFeedType("all")}
+              >
+                All
+              </Tabs.Trigger>
+            </Tabs.List>
+          </Tabs.Root>
+        </div>
+      {:else}
+        <!-- For unauthenticated users, show a simple header -->
+        <div class="px-4 py-3 border-b">
+          <h2 class="font-semibold text-sm text-center">All Posts</h2>
+        </div>
+      {/if}
     </div>
 
     <!-- Feed Content -->

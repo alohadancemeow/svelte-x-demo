@@ -1,34 +1,28 @@
 import type { PageLoad } from "./$types";
 
-export const load: PageLoad = async ({ fetch, parent }) => {
+export const load: PageLoad = async ({ fetch, parent, url }) => {
     const { queryClient } = await parent();
 
+    // Get feedType from URL parameters, default to "all"
+    const feedType = (url.searchParams.get("feedType") as "following" | "all") || "all";
+
     try {
-        // Prefetch the data for the query
+        // Prefetch the data for the query with the current feedType
         await queryClient.prefetchQuery({
-            queryKey: ['posts'],
+            queryKey: ['posts', feedType],
             queryFn: async () => {
-                const response = await fetch('/api/posts');
+                const apiUrl = new URL('/api/posts', url.origin);
+                apiUrl.searchParams.set('feedType', feedType);
+                const response = await fetch(apiUrl.toString());
                 const data = await response.json();
                 return data.posts; // Extract posts array to match the query function
             },
         });
 
-        // Also return the data for SSR
-        // const response = await fetch('/api/posts');
-
-        // if (!response.ok) {
-        //     console.error('Failed to fetch posts from API:', response.status, response.statusText);
-        //     return { posts: [] };
-        // }
-
-        // const data = await response.json();
-
-        // // The API already returns { posts: PostsWithInfo[] }
-        // return { posts: data.posts };
+        return { feedType };
 
     } catch (error) {
         console.error('Error fetching posts:', error);
-        return { posts: [] };
+        return { feedType };
     }
 };
