@@ -5,6 +5,8 @@ import { eq, inArray } from 'drizzle-orm';
 import type { RequestHandler } from './$types';
 import { postsWithInfoSchema } from '$lib/zod-schemas';
 
+// Get all posts with comments and likes
+// GET /api/posts
 export const GET: RequestHandler = async ({ locals, url }) => {
     try {
         const session = locals.session;

@@ -4,8 +4,8 @@
  */
 
 import { db } from './index.js';
-import { comment, commentLike, user } from './schema.js';
-import { eq, and, isNull, desc, asc } from 'drizzle-orm';
+import { comment, commentLike } from './schema.js';
+import { eq, and, asc } from 'drizzle-orm';
 
 export type CommentWithAuthor = {
 	id: string;
@@ -26,11 +26,6 @@ export type CommentWithAuthor = {
 		userId: string;
 		commentId: string;
 	}>;
-	replies?: CommentWithAuthor[];
-	_count?: {
-		replies: number;
-		likes: number;
-	};
 };
 
 /**
@@ -55,45 +50,7 @@ export async function getCommentsForPost(postId: string): Promise<CommentWithAut
 		orderBy: [asc(comment.createdAt)],
 	});
 
-	// Build the comment tree
-	return buildCommentTree(allComments);
-}
-
-/**
- * Get replies for a specific comment
- * Useful for lazy loading or pagination of replies
- */
-export async function getRepliesForComment(
-	commentId: string,
-	limit: number = 10,
-	offset: number = 0
-): Promise<CommentWithAuthor[]> {
-	const replies = await db.query.comment.findMany({
-		where: eq(comment.parentId, commentId),
-		with: {
-			author: {
-				columns: {
-					id: true,
-					name: true,
-					email: true,
-					image: true,
-				},
-			},
-			likes: true,
-		},
-		orderBy: [asc(comment.createdAt)],
-		limit,
-		offset,
-	});
-
-	return replies.map(reply => ({
-		...reply,
-		replies: [],
-		_count: {
-			replies: 0, // You can add a separate query to count replies if needed
-			likes: reply.likes.length,
-		},
-	}));
+	return allComments
 }
 
 /**
@@ -134,14 +91,8 @@ export async function createComment(data: {
 		throw new Error('Failed to create comment');
 	}
 
-	return {
-		...fullComment,
-		replies: [],
-		_count: {
-			replies: 0,
-			likes: 0,
-		},
-	};
+	return fullComment;
+
 }
 
 /**
@@ -176,60 +127,6 @@ export async function createReply(data: {
 }
 
 /**
- * Get comment thread (comment + all its nested replies)
- * Useful for showing a specific comment thread
- */
-export async function getCommentThread(commentId: string): Promise<CommentWithAuthor | null> {
-	const rootComment = await db.query.comment.findFirst({
-		where: eq(comment.id, commentId),
-		with: {
-			author: {
-				columns: {
-					id: true,
-					name: true,
-					email: true,
-					image: true,
-				},
-			},
-			likes: true,
-		},
-	});
-
-	if (!rootComment) {
-		return null;
-	}
-
-	// Get all replies in this thread
-	const allReplies = await db.query.comment.findMany({
-		where: eq(comment.postId, rootComment.postId),
-		with: {
-			author: {
-				columns: {
-					id: true,
-					name: true,
-					email: true,
-					image: true,
-				},
-			},
-			likes: true,
-		},
-		orderBy: [asc(comment.createdAt)],
-	});
-
-	// Filter replies that belong to this thread
-	const threadReplies = allReplies.filter(reply => {
-		if (reply.id === commentId) return false;
-		return isInThread(reply, commentId, allReplies);
-	});
-
-	// Build the tree starting from the root comment
-	const allCommentsInThread = [rootComment, ...threadReplies];
-	const tree = buildCommentTree(allCommentsInThread);
-	
-	return tree[0] || null;
-}
-
-/**
  * Delete a comment and all its replies
  */
 export async function deleteComment(commentId: string, userId: string): Promise<boolean> {
@@ -257,99 +154,6 @@ export async function deleteComment(commentId: string, userId: string): Promise<
 	}
 
 	return true;
-}
-
-/**
- * Helper function to build comment tree from flat array
- */
-function buildCommentTree(comments: any[]): CommentWithAuthor[] {
-	const commentMap = new Map<string, CommentWithAuthor>();
-	const rootComments: CommentWithAuthor[] = [];
-
-	// First pass: create map of all comments
-	comments.forEach(comment => {
-		commentMap.set(comment.id, {
-			...comment,
-			replies: [],
-			_count: {
-				replies: 0,
-				likes: comment.likes?.length || 0,
-			},
-		});
-	});
-
-	// Second pass: build the tree
-	comments.forEach(comment => {
-		const commentNode = commentMap.get(comment.id)!;
-		
-		if (comment.parentId) {
-			// This is a reply
-			const parent = commentMap.get(comment.parentId);
-			if (parent) {
-				parent.replies!.push(commentNode);
-				parent._count!.replies++;
-			}
-		} else {
-			// This is a top-level comment
-			rootComments.push(commentNode);
-		}
-	});
-
-	return rootComments;
-}
-
-/**
- * Helper function to check if a comment is in a specific thread
- */
-function isInThread(comment: any, rootCommentId: string, allComments: any[]): boolean {
-	if (comment.parentId === rootCommentId) {
-		return true;
-	}
-	
-	if (comment.parentId) {
-		const parent = allComments.find(c => c.id === comment.parentId);
-		if (parent) {
-			return isInThread(parent, rootCommentId, allComments);
-		}
-	}
-	
-	return false;
-}
-
-/**
- * Helper function to get all replies recursively
- */
-async function getAllRepliesRecursive(commentId: string): Promise<any[]> {
-	const directReplies = await db.query.comment.findMany({
-		where: eq(comment.parentId, commentId),
-	});
-
-	let allReplies = [...directReplies];
-
-	for (const reply of directReplies) {
-		const nestedReplies = await getAllRepliesRecursive(reply.id);
-		allReplies = [...allReplies, ...nestedReplies];
-	}
-
-	return allReplies;
-}
-
-/**
- * Get comment statistics
- */
-export async function getCommentStats(commentId: string) {
-	const directReplies = await db.query.comment.findMany({
-		where: eq(comment.parentId, commentId),
-	});
-
-	const likes = await db.query.commentLike.findMany({
-		where: eq(commentLike.commentId, commentId),
-	});
-
-	return {
-		replyCount: directReplies.length,
-		likeCount: likes.length,
-	};
 }
 
 /**
@@ -387,14 +191,19 @@ export async function toggleCommentLike(commentId: string, userId: string) {
 }
 
 /**
- * Check if a user has liked a specific comment
+ * Helper function to get all replies recursively
  */
-export async function hasUserLikedComment(commentId: string, userId: string): Promise<boolean> {
-	const like = await db.query.commentLike.findFirst({
-		where: and(
-			eq(commentLike.commentId, commentId),
-			eq(commentLike.userId, userId)
-		),
+async function getAllRepliesRecursive(commentId: string): Promise<any[]> {
+	const directReplies = await db.query.comment.findMany({
+		where: eq(comment.parentId, commentId),
 	});
-	return !!like;
+
+	let allReplies = [...directReplies];
+
+	for (const reply of directReplies) {
+		const nestedReplies = await getAllRepliesRecursive(reply.id);
+		allReplies = [...allReplies, ...nestedReplies];
+	}
+
+	return allReplies;
 }

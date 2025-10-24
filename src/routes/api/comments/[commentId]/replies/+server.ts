@@ -4,6 +4,8 @@ import { comment } from '$lib/server/db/schema';
 import { eq } from 'drizzle-orm';
 import type { RequestHandler } from './$types';
 
+// Get all replies for a comment
+// GET /api/comments/:commentId/replies
 export const GET: RequestHandler = async ({ params }) => {
     try {
         const { commentId } = params;

@@ -98,7 +98,7 @@ export const actions = {
             }
 
             // Create comment or reply using the new functions
-            let newComment;
+            let newComment: Awaited<ReturnType<typeof createComment | typeof createReply>>;
             if (parentId) {
                 // This is a reply to another comment
                 newComment = await createReply({

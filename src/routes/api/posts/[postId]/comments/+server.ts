@@ -5,7 +5,7 @@ import { and, eq, isNull } from 'drizzle-orm';
 import type { RequestHandler } from './$types';
 
 // GET /api/posts/:postId/comments
-// Get root comments of the post
+// Get root comments of the post, exclude replies
 export const GET: RequestHandler = async ({ params }) => {
     try {
         const { postId } = params;
