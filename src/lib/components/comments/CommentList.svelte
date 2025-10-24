@@ -1,21 +1,17 @@
 <script lang="ts">
-  import { ChevronDownIcon, ChevronUpIcon, Loader2Icon } from "@lucide/svelte";
+  import { Loader2Icon } from "@lucide/svelte";
   import { Button } from "$lib/components/ui/button/index.js";
   import CommentCard from "$lib/components/comments/CommentCard.svelte";
   import type { CommentsWithInfo } from "$lib/zod-schemas";
   import { createQuery } from "@tanstack/svelte-query";
 
   interface CommentListProps {
-    depth?: number;
     postId: string;
   }
 
-  let { depth = 0, postId }: CommentListProps = $props();
+  let { postId }: CommentListProps = $props();
 
   const refetch = () => {};
-  // const fetchNextPage = () => {};
-  // const hasNextPage = false;
-  // const isFetchingNextPage = false;
 
   const endpoint = `/api/posts/${postId}/comments`;
 
@@ -64,26 +60,5 @@
         <CommentCard {comment} />
       </div>
     {/each}
-
-    <!-- Show more button -->
-    <!-- {#if hasNextPage}
-    <div class="flex justify-center py-2">
-      <Button
-        variant="ghost"
-        size="sm"
-        onclick={() => fetchNextPage()}
-        disabled={isFetchingNextPage}
-        class="h-8 text-xs text-muted-foreground hover:text-foreground"
-      >
-        {#if isFetchingNextPage}
-          <div class="flex items-center gap-2">
-            <Loader2Icon class="size-4 animate-spin" />
-          </div>
-        {:else}
-          Show more
-        {/if}
-      </Button>
-    </div>
-  {/if} -->
   </div>
 {/if}

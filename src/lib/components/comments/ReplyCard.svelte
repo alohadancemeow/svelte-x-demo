@@ -8,16 +8,14 @@
   interface ReplyCardProps {
     postId: string;
     parentId: string;
-    depth?: number;
+    authorName?: string;
     onCancel?: () => void;
     onSuccess?: () => void;
-    authorName?: string;
   }
 
   let {
     postId,
     parentId,
-    depth = 0,
     onCancel,
     onSuccess,
     authorName = "this comment",
@@ -55,8 +53,7 @@
 <div
   bind:this={replyCardElement}
   class={cn(
-    "relative border-l-2 border-primary/30 bg-muted/30 rounded-md p-3 mt-2 transition-all duration-300 animate-in slide-in-from-top-2",
-    depth > 0 && "ml-2"
+    "relative border-l-2 border-primary/30 bg-muted/30 rounded-md p-3 mt-2 transition-all duration-300 animate-in slide-in-from-top-2"
   )}
 >
   <!-- Reply indicator header -->

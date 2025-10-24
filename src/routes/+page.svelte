@@ -11,8 +11,7 @@
   import { goto } from "$app/navigation";
   import { ArrowUpFromDot } from "@lucide/svelte";
   import Button from "$lib/components/ui/button/button.svelte";
-
-  type FeedType = "following" | "all";
+  import { fetchPosts, type FeedType } from "./helpers";
 
   let { data }: PageProps = $props();
   const session = authClient.useSession();
@@ -42,37 +41,6 @@
     }
   });
 
-  const endpoint = "/api/posts";
-
-  const fetchPosts = async (currentFeedType: FeedType, pageParam: number) => {
-    try {
-      const url = new URL(endpoint, window.location.origin);
-      url.searchParams.set("feedType", currentFeedType);
-      url.searchParams.set("page", pageParam.toString());
-
-      const response = await fetch(url.toString());
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      return data;
-    } catch (error) {
-      console.error("Error fetching posts:", error);
-      // Return a proper structure even on error to prevent undefined access
-      return {
-        posts: [],
-        pagination: {
-          hasNextPage: false,
-          nextPage: null,
-          currentPage: pageParam,
-          totalPages: 0,
-        },
-      };
-    }
-  };
-
   const postsQuery = createInfiniteQuery(() => ({
     queryKey: ["posts", feedType, "infinite"], // Dynamic key based on current feedType
     queryFn: ({ pageParam }) => fetchPosts(feedType, pageParam),
@@ -98,7 +66,7 @@
   // $inspect(posts);
 
   const error = $derived(postsQuery.error);
-  const isLoading = $derived(postsQuery.isLoading);
+  const isPending = $derived(postsQuery.isPending);
   const isFetchingNextPage = $derived(postsQuery.isFetchingNextPage);
   const hasNextPage = $derived(postsQuery.hasNextPage);
   const fetchNextPage = postsQuery.fetchNextPage; // function to fetch next page
@@ -133,7 +101,7 @@
 
 <div class="max-w-3xl mx-auto mt-6">
   <div class="bg-background rounded-lg shadow-sm">
-    <div class="">
+    <div>
       <!-- Post Form -->
       {#if $session.data}
         <div class="p-4">
@@ -155,32 +123,7 @@
 
       <!-- Feed Tabs -->
       {#if $session.data}
-        <div class="px-4 py-3">
-          <Tabs.Root value={feedType} class="w-full">
-            <Tabs.List class="grid w-full grid-cols-2 h-11">
-              <Tabs.Trigger
-                class={cn(
-                  "font-semibold text-base cursor-pointer",
-                  feedType === "following" && "bg-muted"
-                )}
-                value="following"
-                onclick={() => updateFeedType("following")}
-              >
-                Following
-              </Tabs.Trigger>
-              <Tabs.Trigger
-                class={cn(
-                  "font-semibold text-base cursor-pointer",
-                  feedType === "all" && "bg-muted"
-                )}
-                value="all"
-                onclick={() => updateFeedType("all")}
-              >
-                All
-              </Tabs.Trigger>
-            </Tabs.List>
-          </Tabs.Root>
-        </div>
+        {@render feedTabs()}
       {:else}
         <!-- For unauthenticated users, show a simple header -->
         <div class="px-4 py-3 border-b">
@@ -191,7 +134,7 @@
 
     <!-- Feed Content -->
     <div>
-      {#if isLoading}
+      {#if isPending}
         <div>
           {#each Array.from({ length: 3 }) as _, index (index)}
             <PostSkeleton />
@@ -211,63 +154,7 @@
           {/if}
         </div>
       {:else if posts && posts.length === 0}
-        <div class="p-8 text-center max-w-md mx-auto">
-          <div class="mb-4">
-            <svg
-              class="w-16 h-16 mx-auto text-muted-foreground/50"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="1.5"
-                d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
-              />
-            </svg>
-          </div>
-          <h3 class="text-lg font-semibold mb-2">No posts yet!</h3>
-          <p class="text-muted-foreground mb-4">
-            {#if feedType === "following"}
-              Your following feed is empty. Try following some users to see
-              their posts here!
-            {:else}
-              No posts have been shared yet. Be the first to post something
-              interesting!
-            {/if}
-          </p>
-          <div class="space-y-2">
-            {#if feedType === "following"}
-              <button
-                onclick={() => updateFeedType("all")}
-                class="inline-flex cursor-pointer items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
-              >
-                <svg
-                  class="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M12 4v16m8-8H4"
-                  />
-                </svg>
-                Find People to Follow
-              </button>
-            {:else}
-              <button
-                onclick={() => updateFeedType("following")}
-                class="text-primary hover:text-primary/80 transition-colors"
-              >
-                Check your following feed instead
-              </button>
-            {/if}
-          </div>
-        </div>
+        {@render noPostContent()}
       {:else if posts}
         <div>
           {#each posts as post (post.id)}
@@ -289,23 +176,117 @@
           </div>
         {:else if posts.length > 0}
           <!-- Back to Top button when no more posts -->
-          <div class="p-6 text-center">
-            <div class="mb-2">
-              <span class="text-muted-foreground text-sm"
-                >You've reached the end!</span
-              >
-            </div>
-            <Button
-              variant="outline"
-              size="icon"
-              onclick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-              class="bg-background border-border hover:bg-muted p-2 rounded-full"
-            >
-              <ArrowUpFromDot class="w-4 h-4" />
-            </Button>
-          </div>
+          {@render backTotop()}
         {/if}
       {/if}
     </div>
   </div>
 </div>
+
+<!-- Feed Tabs Component -->
+{#snippet feedTabs()}
+  <div class="px-4 py-3">
+    <Tabs.Root value={feedType} class="w-full">
+      <Tabs.List class="grid w-full grid-cols-2 h-11">
+        <Tabs.Trigger
+          class={cn(
+            "font-semibold text-base cursor-pointer",
+            feedType === "following" && "bg-muted"
+          )}
+          value="following"
+          onclick={() => updateFeedType("following")}
+        >
+          Following
+        </Tabs.Trigger>
+        <Tabs.Trigger
+          class={cn(
+            "font-semibold text-base cursor-pointer",
+            feedType === "all" && "bg-muted"
+          )}
+          value="all"
+          onclick={() => updateFeedType("all")}
+        >
+          All
+        </Tabs.Trigger>
+      </Tabs.List>
+    </Tabs.Root>
+  </div>
+{/snippet}
+
+<!-- No Post Content -->
+{#snippet noPostContent()}
+  <div class="p-8 text-center max-w-md mx-auto">
+    <div class="mb-4">
+      <svg
+        class="w-16 h-16 mx-auto text-muted-foreground/50"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="1.5"
+          d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+        />
+      </svg>
+    </div>
+    <h3 class="text-lg font-semibold mb-2">No posts yet!</h3>
+    <p class="text-muted-foreground mb-4">
+      {#if feedType === "following"}
+        Your following feed is empty. Try following some users to see their
+        posts here!
+      {:else}
+        No posts have been shared yet. Be the first to post something
+        interesting!
+      {/if}
+    </p>
+    <div class="space-y-2">
+      {#if feedType === "following"}
+        <button
+          onclick={() => updateFeedType("all")}
+          class="inline-flex cursor-pointer items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
+        >
+          <svg
+            class="w-4 h-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M12 4v16m8-8H4"
+            />
+          </svg>
+          Find People to Follow
+        </button>
+      {:else}
+        <button
+          onclick={() => updateFeedType("following")}
+          class="text-primary hover:text-primary/80 transition-colors"
+        >
+          Check your following feed instead
+        </button>
+      {/if}
+    </div>
+  </div>
+{/snippet}
+
+<!-- Back to Top Button -->
+{#snippet backTotop()}
+  <div class="p-6 text-center">
+    <div class="mb-2">
+      <span class="text-muted-foreground text-sm">You've reached the end!</span>
+    </div>
+    <Button
+      variant="outline"
+      size="icon"
+      onclick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+      class="bg-background border-border hover:bg-muted p-2 rounded-full"
+    >
+      <ArrowUpFromDot class="w-4 h-4" />
+    </Button>
+  </div>
+{/snippet}

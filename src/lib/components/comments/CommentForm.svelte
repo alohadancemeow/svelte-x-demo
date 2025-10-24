@@ -55,7 +55,7 @@
         content = "";
         isFocused = false;
         isPending = false;
-        toast.success("Comment posted successfully");
+        // toast.success("Comment posted successfully");
 
         // Invalidate queries to trigger real-time updates
         await client.invalidateQueries({
