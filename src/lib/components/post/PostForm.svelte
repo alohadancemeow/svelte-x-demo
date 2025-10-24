@@ -23,9 +23,11 @@
     type Feeling,
   } from "$lib/components/post/data.js";
   import { useQueryClient } from "@tanstack/svelte-query";
+  import { generateContent } from "../generate";
 
   let fileInputRef: HTMLInputElement | null = $state(null);
   let isSubmitting = $state(false);
+  let isGenerating = $state(false);
   let privacy: Privacy = $state("public");
   let feeling: Feeling | null = $state(null);
   let previewUrl: string | null = $state(null);
@@ -73,6 +75,40 @@
     text = "";
     feeling = null;
     removeImage();
+  };
+
+  const handleGenerateContent = async () => {
+    if (isGenerating) return;
+
+    try {
+      isGenerating = true;
+      toast.info("Generating content with AI...");
+
+      // Clear existing text to show streaming effect
+      text = "";
+
+      const data = await generateContent({
+        type: "post",
+        onUpdate: (content) => {
+          // Update text in real-time as content streams in
+          text = content;
+        },
+      });
+
+      if (!data.content) {
+        throw new Error("No content received from AI");
+      }
+
+      toast.success("Content generated successfully!");
+    } catch (error) {
+      console.error("Error generating content:", error);
+
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to generate content";
+      toast.error(errorMessage + " or Rate limit exceeded. Please try again.");
+    } finally {
+      isGenerating = false;
+    }
   };
 </script>
 
@@ -234,15 +270,24 @@
               </div>
             </Popover.Content>
           </Popover.Root>
+
+          <!-- Generate Post Content with AI -->
           <Button
             type="button"
             variant={"ghost"}
             size={"icon"}
             class="size-9"
-            disabled={false}
-            onclick={() => {}}
+            disabled={isGenerating || !$session?.data?.user}
+            onclick={handleGenerateContent}
+            title={isGenerating
+              ? "Generating content..."
+              : "Generate content with AI"}
           >
-            <Sparkles class="size-5" />
+            {#if isGenerating}
+              <Loader2Icon class="size-5 animate-spin" />
+            {:else}
+              <Sparkles class="size-5" />
+            {/if}
           </Button>
         </div>
         <Separator orientation="vertical" class="h-6" />

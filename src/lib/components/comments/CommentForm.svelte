@@ -1,7 +1,7 @@
 <script lang="ts">
   import * as Avatar from "$lib/components/ui/avatar/index.js";
   import { Textarea } from "$lib/components/ui/textarea/index.js";
-  import { Loader2Icon } from "@lucide/svelte";
+  import { Loader2Icon, Sparkles } from "@lucide/svelte";
   import { Button } from "$lib/components/ui/button/index.js";
   import { authClient } from "$lib/auth-client";
   import { enhance } from "$app/forms";
@@ -9,6 +9,7 @@
   import { useQueryClient } from "@tanstack/svelte-query";
   import { toast } from "svelte-sonner";
   import { goto } from "$app/navigation";
+  import { generateContent } from "../generate";
 
   interface CommentFormProps {
     postId: string;
@@ -21,9 +22,43 @@
   let content = $state(mentionText ? `@${mentionText} ` : "");
   let isFocused = $state(false);
   let isPending = $state(false);
+  let isGenerating = $state(false);
 
   const session = authClient.useSession();
   const client = useQueryClient();
+
+  const handleGenerateContent = async () => {
+    if (isGenerating) return;
+
+    try {
+      isGenerating = true;
+      toast.info("Generating content with AI...");
+
+      // Clear existing content to show streaming effect
+      content = "";
+
+      const data = await generateContent({
+        type: "comment",
+        onUpdate: (generatedContent) => {
+          // Update content in real-time as it streams in
+          content = generatedContent;
+        },
+      });
+
+      if (!data.content) {
+        throw new Error("No content received from AI");
+      }
+
+      toast.success("Content generated successfully!");
+    } catch (error) {
+      console.error("Error generating content:", error);
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to generate content";
+      toast.error(errorMessage + " or Rate limit exceeded. Please try again.");
+    } finally {
+      isGenerating = false;
+    }
+  };
 
   // $inspect(content);
 </script>
@@ -114,24 +149,45 @@
     <div
       class="overflow-hidden rounded-lg border bg-background transition-shadow focus-within:ring-2 focus-within:ring-ring relative"
     >
-      <Textarea
-        name="content"
-        placeholder={!$session?.data?.user
-          ? "Sign in to comment"
-          : mentionText
-            ? `Mention @${mentionText} in your comment...`
-            : parentId
-              ? "Add a reply"
-              : "Add a comment"}
-        bind:value={content}
-        onfocus={() => (isFocused = true)}
-        onblur={() => !content.trim() && (isFocused = false)}
-        disabled={!$session?.data?.user}
-        class="w-full resize-none min-h-[2.5rem] border-0 bg-transparent px-3 py-2 focus:outline-none {!$session
-          ?.data?.user
-          ? 'cursor-pointer'
-          : ''}"
-      />
+      <div class="flex gap-2 items-center">
+        <Textarea
+          name="content"
+          placeholder={!$session?.data?.user
+            ? "Sign in to comment"
+            : mentionText
+              ? `Mention @${mentionText} in your comment...`
+              : parentId
+                ? "Add a reply"
+                : "Add a comment"}
+          bind:value={content}
+          onfocus={() => (isFocused = true)}
+          onblur={() => !content.trim() && (isFocused = false)}
+          disabled={!$session?.data?.user}
+          class="w-full resize-none min-h-[2.5rem] border-0 bg-transparent px-3 py-2 focus:outline-none {!$session
+            ?.data?.user
+            ? 'cursor-pointer'
+            : ''}"
+        />
+
+        <!-- Generate Comment Content with AI -->
+        <Button
+          type="button"
+          variant={"ghost"}
+          size={"icon"}
+          class="mx-2"
+          disabled={isGenerating || !$session?.data?.user}
+          onclick={handleGenerateContent}
+          title={isGenerating
+            ? "Generating content..."
+            : "Generate content with AI"}
+        >
+          {#if isGenerating}
+            <Loader2Icon class="size-5 animate-spin" />
+          {:else}
+            <Sparkles class="size-4" />
+          {/if}
+        </Button>
+      </div>
 
       <!-- Show character count and submit button when focused or content exists -->
       {#if isFocused || content}
