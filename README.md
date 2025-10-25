@@ -2,12 +2,17 @@
 
 A modern full-stack web application built with SvelteKit, featuring authentication, database integration, and social media functionality.
 
+![screenshot](static/Screenshot-x-demo.png)
+
 ## 🚀 Features
 
 - **Authentication**: Secure user authentication with Better Auth
 - **Social Login**: Google and GitHub OAuth integration
 - **Database**: SQLite/Turso database with Drizzle ORM
-- **Modern UI**: Responsive design with Tailwind CSS
+- **Modern UI**: Responsive design with Tailwind CSS and shadcn/ui components
+- **AI Integration**: Google Generative AI for content generation
+- **Real-time Features**: Post creation, comments, likes, and user interactions
+- **Image Upload**: File upload functionality (development mode)
 - **Type Safety**: Full TypeScript support
 - **Production Ready**: Optimized for Vercel deployment
 
@@ -16,7 +21,9 @@ A modern full-stack web application built with SvelteKit, featuring authenticati
 - **Framework**: [SvelteKit](https://kit.svelte.dev/)
 - **Authentication**: [Better Auth](https://www.better-auth.com/)
 - **Database**: [Drizzle ORM](https://orm.drizzle.team/) with SQLite/Turso
-- **Styling**: [Tailwind CSS](https://tailwindcss.com/)
+- **Styling**: [Tailwind CSS](https://tailwindcss.com/) + [shadcn/ui](https://ui.shadcn.com/)
+- **AI**: [Google Generative AI](https://ai.google.dev/)
+- **State Management**: [TanStack Query](https://tanstack.com/query)
 - **Language**: [TypeScript](https://www.typescriptlang.org/)
 - **Deployment**: [Vercel](https://vercel.com/)
 
@@ -55,6 +62,9 @@ Before running this project, ensure you have the following installed:
    GOOGLE_CLIENT_SECRET=your-google-client-secret
    GITHUB_CLIENT_ID=your-github-client-id
    GITHUB_CLIENT_SECRET=your-github-client-secret
+   GOOGLE_GENERATIVE_AI_API_KEY=your-google-ai-api-key
+   TURSO_DATABASE_URL=your-turso-database-url
+   TURSO_AUTH_TOKEN=your-turso-auth-token
    ```
 
 4. **Initialize the database**
@@ -94,12 +104,8 @@ The project uses SQLite for local development. The database file (`local.db`) is
 For production, we recommend using [Turso](https://turso.tech/) or another cloud database:
 
 1. **Set up cloud database** (see [DATABASE_SETUP.md](./DATABASE_SETUP.md))
-2. **Create production environment file**
-   ```bash
-   cp .env.production.example .env.production
-   ```
-3. **Update production environment variables**
-4. **Run production migrations**
+2. **Update production environment variables** in your deployment platform
+3. **Run production migrations**
    ```bash
    pnpm db:migrate:prod
    ```
@@ -147,6 +153,9 @@ For production, we recommend using [Turso](https://turso.tech/) or another cloud
    GOOGLE_CLIENT_SECRET=your-google-client-secret
    GITHUB_CLIENT_ID=your-github-client-id
    GITHUB_CLIENT_SECRET=your-github-client-secret
+   GOOGLE_GENERATIVE_AI_API_KEY=your-google-ai-api-key
+   TURSO_DATABASE_URL=your-turso-database-url
+   TURSO_AUTH_TOKEN=your-turso-auth-token
    ```
 
 4. **Deploy and run migrations**

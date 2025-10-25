@@ -24,6 +24,7 @@
   } from "$lib/components/post/data.js";
   import { useQueryClient } from "@tanstack/svelte-query";
   import { generateContent } from "../generate";
+  import { dev } from "$app/environment";
 
   let fileInputRef: HTMLInputElement | null = $state(null);
   let isSubmitting = $state(false);
@@ -192,7 +193,7 @@
           </div>
         {/if}
 
-        {#if previewUrl}
+        {#if dev && previewUrl}
           <div class="relative">
             <img
               src={previewUrl}
@@ -222,24 +223,44 @@
       <div class="flex items-center gap-2">
         <div class="flex items-center gap-0.5">
           <!-- Image Select -->
-          <input
-            bind:this={fileInputRef}
-            type="file"
-            accept="image/*"
-            class="hidden"
-            id="image-upload"
-            onchange={handleImageSelect}
-          />
-          <Button
-            type="button"
-            variant={"ghost"}
-            size={"icon"}
-            class="size-9"
-            onclick={() => fileInputRef?.click()}
-            disabled={false}
-          >
-            <ImagePlusIcon class="size-5" />
-          </Button>
+          {#if dev}
+            <input
+              bind:this={fileInputRef}
+              type="file"
+              accept="image/*"
+              class="hidden"
+              id="image-upload"
+              onchange={handleImageSelect}
+            />
+            <Button
+              type="button"
+              variant={"ghost"}
+              size={"icon"}
+              class="size-9"
+              onclick={() => fileInputRef?.click()}
+              disabled={isSubmitting}
+            >
+              <ImagePlusIcon class="size-5" />
+            </Button>
+          {:else}
+            <!-- Image Upload not available in production for now -->
+            <div class="relative">
+              <Button
+                type="button"
+                variant={"ghost"}
+                size={"icon"}
+                class="size-9"
+                disabled={isSubmitting}
+                title="Image upload - Coming soon in production"
+                onclick={() =>
+                  toast.info(
+                    "Image upload feature is coming soon in production! 🚀"
+                  )}
+              >
+                <ImagePlusIcon class="size-5" />
+              </Button>
+            </div>
+          {/if}
 
           <!-- Feeling Select -->
           <Popover.Root>
