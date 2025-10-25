@@ -3,7 +3,7 @@ import { QueryClient } from '@tanstack/svelte-query'
 import type { LayoutLoad } from './$types'
 import { authClient } from '$lib/auth-client'
 
-// export const prerender = false;
+export const prerender = false;
 
 export const load: LayoutLoad = async ({ }) => {
     const queryClient = new QueryClient({
@@ -14,7 +14,18 @@ export const load: LayoutLoad = async ({ }) => {
         },
     })
 
-    const session = await authClient.getSession();
+    // Only get session on client side to prevent server-side fetch issues
+    let sessionId = null;
+    
+    if (browser) {
+        try {
+            const session = await authClient.getSession();
+            sessionId = session?.data?.session?.id || null;
+        } catch (error) {
+            console.warn('Failed to get session:', error);
+            sessionId = null;
+        }
+    }
 
-    return { queryClient, sessionId: session?.data?.session?.id || null }
+    return { queryClient, sessionId }
 }

@@ -10,6 +10,19 @@ export const auth = betterAuth({
         provider: "sqlite", // or "mysql", "sqlite"
     }),
 
+    // Configure base URL for Vercel deployment
+    baseURL: env.BETTER_AUTH_URL || "http://localhost:5173",
+    
+    // Add trusted origins for production
+    trustedOrigins: [
+        env.BETTER_AUTH_URL || "http://localhost:5173",
+        "http://localhost:5173",
+        "https://localhost:5173"
+    ].filter(Boolean),
+
+    // Configure secret for session security
+    secret: env.BETTER_AUTH_SECRET,
+
     socialProviders: {
         google: {
             prompt: "select_account",

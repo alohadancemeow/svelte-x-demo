@@ -1,6 +1,6 @@
-import { PUBLIC_BASE_URL } from "$env/static/public";
 import { createAuthClient } from "better-auth/svelte";
+import { browser } from "$app/environment";
 
 export const authClient = createAuthClient({
-    baseURL: PUBLIC_BASE_URL,
+    baseURL: browser ? window.location.origin : "http://localhost:5173",
 });
